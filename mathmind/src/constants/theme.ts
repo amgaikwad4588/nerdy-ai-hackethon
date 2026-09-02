@@ -26,6 +26,28 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/**
+ * MathMind brand palette. Warm, focused, and high-contrast — friendly enough for a
+ * grade 3-5 learner, calm enough to keep an ADHD single-task screen low-distraction.
+ * Deliberately not AI-slop (no purple mesh gradients / generic glassmorphism).
+ */
+export const Brand = {
+  primary: '#2F6FED', // calm confident blue — actions, focus
+  primaryDark: '#1E4FB8',
+  ink: '#16233B', // near-navy text
+  correct: '#1FA971', // green — mastery, "yes"
+  gentle: '#F4A62A', // amber — nudge, "not yet" (never harsh red for kids)
+  spark: '#F26D5B', // coral accent — rewards, streaks
+  cream: '#FBF7EF', // warm off-white canvas
+  card: '#FFFFFF',
+  muted: '#6B7687',
+  domain: {
+    'base-ten': '#2F6FED',
+    operations: '#7A5AF8',
+    fractions: '#1FA971',
+  } as Record<string, string>,
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

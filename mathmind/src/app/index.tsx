@@ -1,98 +1,153 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { BigButton } from '@/components/big-button';
+import { MasteryRing } from '@/components/mastery-ring';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { DOMAIN_LABEL, SKILLS, SKILL_BY_ID } from '@/lib/curriculum';
+import { MASTERY_THRESHOLD, useStore } from '@/lib/store';
+import { tutorMode } from '@/lib/tutor';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+export default function Home() {
+  const router = useRouter();
+  const { studentName, mastery, xp, streak, setRole, loadDemoData } = useStore();
 
-export default function HomeScreen() {
+  const overall =
+    SKILLS.reduce((s, sk) => s + (mastery[sk.id] ?? 0), 0) / SKILLS.length;
+  const mastered = SKILLS.filter((s) => (mastery[s.id] ?? 0) >= MASTERY_THRESHOLD).length;
+
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
+    <SafeAreaView style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.headerRow}>
+          <View>
+            <ThemedText type="title" style={styles.brand}>
+              MathMind
+            </ThemedText>
+            <ThemedText style={{ color: Brand.muted }}>
+              Talk-it-through math for grades 3–5
+            </ThemedText>
+          </View>
+          <MasteryRing level={overall} size={64} color={Brand.primary} />
+        </View>
+
+        {/* Student entry */}
+        <View style={styles.card}>
+          <ThemedText type="subtitle" style={{ color: Brand.ink }}>
+            Hi {studentName}! 👋
           </ThemedText>
-        </ThemedView>
+          <ThemedText style={{ color: Brand.muted, marginBottom: Spacing.three }}>
+            {mastered} of {SKILLS.length} skills mastered · {xp} XP · {streak}🔥 streak
+          </ThemedText>
+          <BigButton
+            label="Start a 90-second practice"
+            color={Brand.primary}
+            onPress={() => {
+              setRole('student');
+              router.push('/learn');
+            }}
+          />
+        </View>
 
-        <ThemedText type="code" style={styles.code}>
-          get started
+        {/* Skill chips */}
+        <ThemedText type="smallBold" style={styles.sectionLabel}>
+          YOUR SKILLS
         </ThemedText>
+        <View style={styles.skillGrid}>
+          {SKILLS.map((s) => (
+            <View key={s.id} style={styles.skillChip}>
+              <MasteryRing
+                level={mastery[s.id] ?? 0}
+                size={44}
+                color={Brand.domain[s.domain]}
+              />
+              <View style={{ flex: 1 }}>
+                <ThemedText type="smallBold" style={{ color: Brand.ink }}>
+                  {s.title}
+                </ThemedText>
+                <ThemedText type="small" style={{ color: Brand.muted }}>
+                  {DOMAIN_LABEL[s.domain]}
+                </ThemedText>
+              </View>
+            </View>
+          ))}
+        </View>
 
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
+        {/* Teacher entry */}
+        <View style={[styles.card, { marginTop: Spacing.four }]}>
+          <ThemedText type="smallBold" style={{ color: Brand.ink }}>
+            For teachers
+          </ThemedText>
+          <ThemedText type="small" style={{ color: Brand.muted, marginBottom: Spacing.three }}>
+            See each student's mastery and the misconceptions to reteach.
+          </ThemedText>
+          <BigButton
+            label="Open class dashboard"
+            variant="ghost"
+            color={Brand.ink}
+            onPress={() => {
+              setRole('teacher');
+              loadDemoData();
+              router.push('/teacher');
+            }}
           />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
+        </View>
 
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+        <ThemedText type="small" style={styles.footer}>
+          Tutor mode: {tutorMode === 'live' ? 'Live (Claude)' : 'Offline demo'} ·{' '}
+          {SKILL_BY_ID['frac-compare'].code} + 5 more skills
+        </ThemedText>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: Brand.cream },
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
+    padding: Spacing.four,
     gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
     maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
   },
-  heroSection: {
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
+    justifyContent: 'space-between',
+    marginBottom: Spacing.two,
   },
-  title: {
-    textAlign: 'center',
+  brand: { color: Brand.ink, fontSize: 40, lineHeight: 44 },
+  card: {
+    backgroundColor: Brand.card,
+    borderRadius: 20,
+    padding: Spacing.four,
+    gap: Spacing.one,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
   },
-  code: {
-    textTransform: 'uppercase',
+  sectionLabel: {
+    color: Brand.muted,
+    letterSpacing: 1,
+    marginTop: Spacing.three,
+    marginBottom: Spacing.one,
   },
-  stepContainer: {
+  skillGrid: { gap: Spacing.two },
+  skillChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
+    backgroundColor: Brand.card,
+    borderRadius: 16,
+    padding: Spacing.three,
+  },
+  footer: {
+    textAlign: 'center',
+    color: Brand.muted,
+    marginTop: Spacing.four,
   },
 });

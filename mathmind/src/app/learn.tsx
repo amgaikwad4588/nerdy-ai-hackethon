@@ -143,8 +143,8 @@ export default function Learn() {
       <View style={styles.container}>
         <FocusGuard studentName={studentName} />
 
-        {/* Progress + the one skill in focus */}
-        <View style={styles.topRow}>
+        {/* Progress, then a tidy row: skill on the left, mastery on the right */}
+        <View style={styles.header}>
           <View style={styles.progressTrack}>
             <View
               style={[
@@ -153,14 +153,14 @@ export default function Learn() {
               ]}
             />
           </View>
-          <View style={{ transform: [{ rotate: '3deg' }] }}>
-            <MasteryRing level={mastery[skill.id] ?? 0} size={42} color={accent} />
+          <View style={styles.labelRow}>
+            <StickyTag label={`${skill.title.toUpperCase()} · LVL ${difficulty[skill.id] ?? 1}`} rotate={-1.5} />
+            <MasteryRing level={mastery[skill.id] ?? 0} size={40} color={accent} />
           </View>
         </View>
-        <StickyTag label={`${skill.title.toUpperCase()} · LVL ${difficulty[skill.id] ?? 1}`} rotate={-2} />
 
         {/* The single task in focus — taped to the page */}
-        <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.taskCard}>
+        <SketchSurface decoration="tape" rotate={-0.75} shadow={6} radius="lg" style={styles.taskCard}>
           <Pressable onPress={() => speak(task.prompt)} style={styles.speaker} hitSlop={12}>
             <SpeakerIcon size={20} />
           </Pressable>
@@ -265,7 +265,8 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   centered: { flex: 1, justifyContent: 'center', padding: Spacing.four, maxWidth: MaxContentWidth, width: '100%', alignSelf: 'center' },
-  topRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  header: { gap: Spacing.two },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   progressTrack: {
     flex: 1,
     height: 16,
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   progressFill: { height: '100%', borderRadius: 6 },
-  taskCard: { minHeight: 150, justifyContent: 'center' },
+  taskCard: { minHeight: 120, justifyContent: 'center' },
   speaker: {
     position: 'absolute',
     top: 12,

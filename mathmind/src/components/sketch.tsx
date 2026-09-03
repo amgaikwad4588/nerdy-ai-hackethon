@@ -9,7 +9,7 @@ import Svg, { Circle, Defs, Path, Pattern, Polygon, Rect } from 'react-native-sv
 import { ThemedText } from '@/components/themed-text';
 import { Brand, offsetShadow, Wobbly } from '@/constants/theme';
 
-/** Hand-drawn speaker glyph (read-aloud affordance) — replaces the 🔊 emoji. */
+/** Hand-drawn speaker glyph — the read-aloud affordance. */
 export function SpeakerIcon({ size = 20, color = Brand.ink }: { size?: number; color?: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">

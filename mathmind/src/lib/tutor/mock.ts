@@ -7,10 +7,10 @@ import { detectMisconception, isCorrect, SKILL_BY_ID } from '../curriculum';
 import type { Task, TutorResult } from '../types';
 
 const praise = [
-  'Yes! Walk me through how you knew that.',
-  'Nice thinking — that’s exactly right.',
-  'You got it. What was the key step for you?',
-  'Correct! Tell me the trick you used.',
+  'Walk me through how you knew that.',
+  'Nice thinking — what was the key step?',
+  'You got it. What trick did you use?',
+  'Spot on. How did you check it?',
 ];
 
 const onTrackNudges = [

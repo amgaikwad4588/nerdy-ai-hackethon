@@ -1,18 +1,24 @@
-// Focus Guard (web) — on-device presence + identity check during study.
+// Focus Guard (web) — enroll a photo, then random spot-checks during study.
 //
-// Enroll once ("This is me"), then every few seconds we run face detection on the
-// webcam frame and confirm exactly one face is present and it matches the enrolled
-// student. Flags: away (no face), stranger (someone else), or more-than-one person.
+// Flow:
+//   1. Turn on camera. A live preview shows an alignment oval; we detect the face
+//      live and only enable "Capture my photo" once it's a single, centered,
+//      close-enough face.
+//   2. That photo becomes the reference (we store its face descriptor + thumbnail).
+//   3. While studying, the camera silently snaps a photo at RANDOM intervals and an
+//      on-device model compares the two faces (euclidean distance between 128-d
+//      descriptors). Each check reports: on task, no one there, a stranger, or more
+//      than one person.
 //
 // Privacy by design: everything runs in the browser via @vladmandic/face-api +
-// getUserMedia. No frame, image, or descriptor ever leaves the device; nothing is
-// uploaded or stored server-side. It is strictly opt-in.
+// getUserMedia. No frame, photo, or descriptor ever leaves the device or is uploaded.
+// Strictly opt-in.
 //
-// DOM objects are typed loosely (`any`) so this compiles under the app's RN tsconfig
-// without pulling in the DOM lib; this file only ever runs on web.
+// DOM objects are typed loosely (`any`) so this compiles under the app's RN tsconfig;
+// this file only ever runs on web.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Image, StyleSheet, View } from 'react-native';
 
 import { BigButton } from '@/components/big-button';
 import { SketchSurface } from '@/components/sketch';
@@ -21,37 +27,49 @@ import { Brand, Spacing, Wobbly } from '@/constants/theme';
 
 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const MATCH_THRESHOLD = 0.55; // lower = stricter identity match
-const CHECK_MS = 2500;
+const CHECK_MIN_MS = 4000; // random spot-check window
+const CHECK_MAX_MS = 12000;
+const ALIGN_MS = 500;
 
 type Status = 'ok' | 'away' | 'stranger' | 'multiple';
-type Phase = 'off' | 'loading' | 'enroll' | 'watching' | 'error';
+type Phase = 'off' | 'starting' | 'align' | 'watching' | 'error';
 
 const g: any = globalThis;
 
-const STATUS_UI: Record<Status, { color: string; label: string }> = {
-  ok: { color: Brand.blue, label: 'Just you — great focus!' },
-  away: { color: Brand.gentle, label: 'Can’t see you — come back to the screen.' },
-  stranger: { color: Brand.accent, label: 'That doesn’t look like you. Everything ok?' },
-  multiple: { color: Brand.accent, label: 'Looks like more than one person is here.' },
+const STATUS_UI: Record<Status, { color: string; short: string; label: string }> = {
+  ok: { color: Brand.blue, short: 'On task', label: 'Just you — great focus!' },
+  away: { color: Brand.gentle, short: 'Away', label: 'Nobody at the screen — come back and keep going.' },
+  stranger: { color: Brand.accent, short: 'Check in', label: 'That doesn’t look like you. Everything ok?' },
+  multiple: { color: Brand.accent, short: 'Check in', label: 'Looks like more than one person is here.' },
 };
 
 export function FocusGuard({ studentName }: { studentName: string }) {
-  const containerRef = useRef<any>(null); // RNW View -> DOM node we append <video> to
+  const stageRef = useRef<any>(null); // RNW View -> DOM node we append <video> to
   const videoRef = useRef<any>(null);
   const streamRef = useRef<any>(null);
   const faceapiRef = useRef<any>(null);
   const enrolledRef = useRef<any>(null);
-  const timerRef = useRef<any>(null);
+  const alignTimer = useRef<any>(null);
+  const checkTimer = useRef<any>(null);
+  const mounted = useRef(true);
 
   const [phase, setPhase] = useState<Phase>('off');
   const [status, setStatus] = useState<Status | null>(null);
+  const [enrolledPhoto, setEnrolledPhoto] = useState<string | null>(null);
+  const [lastShot, setLastShot] = useState<{ uri: string; status: Status } | null>(null);
+  const [alignHint, setAlignHint] = useState('Getting the camera ready…');
+  const [canCapture, setCanCapture] = useState(false);
   const [error, setError] = useState('');
 
+  const clearTimers = useCallback(() => {
+    if (alignTimer.current) clearInterval(alignTimer.current);
+    if (checkTimer.current) clearTimeout(checkTimer.current);
+    alignTimer.current = null;
+    checkTimer.current = null;
+  }, []);
+
   const stopEverything = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
+    clearTimers();
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t: any) => t.stop());
       streamRef.current = null;
@@ -61,24 +79,46 @@ export function FocusGuard({ studentName }: { studentName: string }) {
       videoRef.current.remove?.();
       videoRef.current = null;
     }
-  }, []);
+  }, [clearTimers]);
 
-  useEffect(() => () => stopEverything(), [stopEverything]);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      stopEverything();
+    };
+  }, [stopEverything]);
 
-  const detectorOpts = () =>
-    new faceapiRef.current.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+  const opts = () => new faceapiRef.current.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+
+  // Draw the current (mirrored) frame to a canvas so the snapshot matches the preview.
+  function snapshot(): any {
+    const v = videoRef.current;
+    const canvas = g.document.createElement('canvas');
+    canvas.width = v.videoWidth || 320;
+    canvas.height = v.videoHeight || 240;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
 
   async function enable() {
     try {
       setError('');
       setStatus(null);
-      setPhase('loading');
+      setLastShot(null);
+      setEnrolledPhoto(null);
+      setCanCapture(false);
+      setAlignHint('Getting the camera ready…');
+      setPhase('starting');
 
-      // 1. Camera (prompts the browser permission dialog).
       const stream = await g.navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
         audio: false,
       });
+      if (!mounted.current) return stream.getTracks().forEach((t: any) => t.stop());
       streamRef.current = stream;
 
       const video = g.document.createElement('video');
@@ -86,71 +126,124 @@ export function FocusGuard({ studentName }: { studentName: string }) {
       video.muted = true;
       video.playsInline = true;
       video.style.width = '100%';
-      video.style.maxHeight = '220px';
+      video.style.height = '100%';
       video.style.objectFit = 'cover';
-      video.style.borderRadius = '14px';
-      video.style.transform = 'scaleX(-1)'; // mirror like a selfie
+      video.style.transform = 'scaleX(-1)';
       video.style.display = 'block';
       video.srcObject = stream;
-      containerRef.current?.appendChild(video);
+      stageRef.current?.appendChild(video);
       videoRef.current = video;
       await video.play?.().catch(() => {});
 
-      // 2. Models (tiny detector + landmarks + recognition), loaded on-device.
-      // Import the browser ESM build explicitly — the package's default entry pulls in
-      // the Node TensorFlow backend, which Metro can't (and shouldn't) resolve for web.
-      // @ts-ignore — deep path to the browser bundle; it ships no types at this path.
-      const faceapi = faceapiRef.current ?? (await import('@vladmandic/face-api/dist/face-api.esm.js'));
+      const faceapi =
+        faceapiRef.current ??
+        // @ts-ignore — browser ESM build; the default entry pulls in the Node TF backend.
+        (await import('@vladmandic/face-api/dist/face-api.esm.js'));
       faceapiRef.current = faceapi;
       await Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
         faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
       ]);
+      if (!mounted.current) return;
 
-      setPhase('enroll');
+      setPhase('align');
+      alignTimer.current = setInterval(runAlign, ALIGN_MS);
     } catch (e) {
+      if (!mounted.current) return;
       setError(friendlyError(e));
       setPhase('error');
       stopEverything();
     }
   }
 
-  async function enroll() {
+  // Live guidance so the enrollment photo is well framed.
+  async function runAlign() {
+    const faceapi = faceapiRef.current;
+    const v = videoRef.current;
+    if (!faceapi || !v || !v.videoWidth) return;
+    try {
+      const faces = await faceapi.detectAllFaces(v, opts());
+      if (faces.length === 0) {
+        setCanCapture(false);
+        return setAlignHint('Come into the frame so I can see your face.');
+      }
+      if (faces.length > 1) {
+        setCanCapture(false);
+        return setAlignHint('Just you for this photo — ask others to step out.');
+      }
+      const box = faces[0].box;
+      const ratio = box.width / v.videoWidth;
+      const cx = (box.x + box.width / 2) / v.videoWidth;
+      if (ratio < 0.24) {
+        setCanCapture(false);
+        return setAlignHint('Move a little closer to the camera.');
+      }
+      if (cx < 0.32 || cx > 0.68) {
+        setCanCapture(false);
+        return setAlignHint('Center your face in the circle.');
+      }
+      setCanCapture(true);
+      setAlignHint('Perfect — hold still and capture.');
+    } catch {
+      /* transient */
+    }
+  }
+
+  async function capture() {
     try {
       const faceapi = faceapiRef.current;
+      const canvas = snapshot();
       const res = await faceapi
-        .detectSingleFace(videoRef.current, detectorOpts())
+        .detectSingleFace(canvas, opts())
         .withFaceLandmarks()
         .withFaceDescriptor();
       if (!res) {
-        setError('Center your face in the frame and try again.');
+        setError('Could not read your face — line up again and retry.');
         return;
       }
       enrolledRef.current = res.descriptor;
+      setEnrolledPhoto(canvas.toDataURL('image/jpeg', 0.7));
       setError('');
+      if (alignTimer.current) clearInterval(alignTimer.current);
+      alignTimer.current = null;
       setPhase('watching');
-      timerRef.current = setInterval(check, CHECK_MS);
-      check();
+      scheduleCheck(1500); // first spot-check soon after enrolling
     } catch (e) {
       setError(friendlyError(e));
     }
   }
 
-  async function check() {
+  function scheduleCheck(delay?: number) {
+    const wait = delay ?? CHECK_MIN_MS + Math.random() * (CHECK_MAX_MS - CHECK_MIN_MS);
+    checkTimer.current = setTimeout(runCheck, wait);
+  }
+
+  // A random spot-check: snap a photo and compare it to the enrolled face.
+  async function runCheck() {
     const faceapi = faceapiRef.current;
-    if (!faceapi || !videoRef.current || !enrolledRef.current) return;
+    if (!faceapi || !videoRef.current || !enrolledRef.current || !mounted.current) return;
     try {
+      const canvas = snapshot();
       const results = await faceapi
-        .detectAllFaces(videoRef.current, detectorOpts())
+        .detectAllFaces(canvas, opts())
         .withFaceLandmarks()
         .withFaceDescriptors();
-      if (results.length === 0) return setStatus('away');
-      if (results.length > 1) return setStatus('multiple');
-      const dist = faceapi.euclideanDistance(enrolledRef.current, results[0].descriptor);
-      setStatus(dist < MATCH_THRESHOLD ? 'ok' : 'stranger');
+
+      let next: Status;
+      if (results.length === 0) next = 'away';
+      else if (results.length > 1) next = 'multiple';
+      else {
+        const dist = faceapi.euclideanDistance(enrolledRef.current, results[0].descriptor);
+        next = dist < MATCH_THRESHOLD ? 'ok' : 'stranger';
+      }
+      if (!mounted.current) return;
+      setStatus(next);
+      setLastShot({ uri: canvas.toDataURL('image/jpeg', 0.6), status: next });
     } catch {
-      /* transient frame error — keep last status */
+      /* keep last status */
+    } finally {
+      if (mounted.current) scheduleCheck();
     }
   }
 
@@ -158,64 +251,77 @@ export function FocusGuard({ studentName }: { studentName: string }) {
     stopEverything();
     enrolledRef.current = null;
     setStatus(null);
+    setLastShot(null);
+    setEnrolledPhoto(null);
     setError('');
     setPhase('off');
   }
 
-  const active = phase !== 'off';
+  const active = phase === 'align' || phase === 'watching' || phase === 'starting';
   const s = status ? STATUS_UI[status] : null;
 
   return (
-    <SketchSurface radius="md" shadow={3} rotate={-0.5} style={{ gap: Spacing.two }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+    <SketchSurface radius="md" shadow={3} style={{ gap: Spacing.two }}>
+      <View style={styles.headerRow}>
         <ThemedText type="smallBold">FOCUS GUARD</ThemedText>
         {phase === 'watching' && s && (
-          <View
-            style={{
-              backgroundColor: s.color,
-              paddingHorizontal: Spacing.two,
-              paddingVertical: 3,
-              ...Wobbly.sm,
-            }}
-          >
-            <ThemedText type="smallBold" color="#fff">
-              {status === 'ok' ? 'On task' : 'Check in'}
-            </ThemedText>
+          <View style={[styles.pill, { backgroundColor: s.color }]}>
+            <ThemedText type="smallBold" color="#fff">{s.short}</ThemedText>
           </View>
         )}
       </View>
 
-      {/* Camera preview mounts here (DOM <video>) */}
-      <View ref={containerRef} style={{ minHeight: active ? 0 : 0 }} />
+      {/* Live camera stage with alignment oval (video appended imperatively) */}
+      {active && (
+        <View style={styles.stage}>
+          <View ref={stageRef} style={StyleSheet.absoluteFill} />
+          {phase === 'align' && (
+            <View pointerEvents="none" style={styles.guideWrap}>
+              <View
+                style={[
+                  styles.guideOval,
+                  { borderColor: canCapture ? Brand.blue : 'rgba(253,251,247,0.85)' },
+                ]}
+              />
+            </View>
+          )}
+        </View>
+      )}
 
       {phase === 'off' && (
         <>
           <ThemedText type="small" color={Brand.muted}>
-            Turn on the camera to check that it&apos;s just {studentName} studying. Runs
-            on your device only — nothing is recorded or uploaded.
+            Take one photo of {studentName}, then the camera quietly checks a few random
+            snapshots while you study. Runs on this device only — nothing is uploaded.
           </ThemedText>
           <BigButton label="Turn on Focus Guard" variant="ghost" tint={Brand.ink} onPress={enable} />
         </>
       )}
 
-      {phase === 'loading' && (
+      {phase === 'starting' && (
         <ThemedText type="small" color={Brand.muted}>
           Starting camera and loading the on-device model…
         </ThemedText>
       )}
 
-      {phase === 'enroll' && (
+      {phase === 'align' && (
         <>
-          <ThemedText type="small" color={Brand.muted}>
-            Look at the camera, {studentName}, then tap to remember your face.
+          <ThemedText type="small" color={canCapture ? Brand.blue : Brand.muted} style={styles.center}>
+            {alignHint}
           </ThemedText>
           {!!error && (
-            <ThemedText type="small" color={Brand.accent}>
+            <ThemedText type="small" color={Brand.accent} style={styles.center}>
               {error}
             </ThemedText>
           )}
-          <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-            <BigButton label="This is me" variant="primary" onPress={enroll} style={{ flex: 1 }} />
+          <View style={styles.btnRow}>
+            <BigButton
+              label="Capture my photo"
+              variant="primary"
+              disabled={!canCapture}
+              onPress={capture}
+              style={{ flex: 1 }}
+            />
             <BigButton label="Turn off" variant="ghost" tint={Brand.muted} onPress={disable} />
           </View>
         </>
@@ -223,26 +329,38 @@ export function FocusGuard({ studentName }: { studentName: string }) {
 
       {phase === 'watching' && s && (
         <>
-          <View
-            style={{
-              borderWidth: 3,
-              borderColor: s.color,
-              backgroundColor: status === 'ok' ? Brand.card : Brand.postit,
-              padding: Spacing.three,
-              ...Wobbly.md,
-            }}
-          >
+          <View style={styles.thumbRow}>
+            {enrolledPhoto && (
+              <View style={styles.thumbBox}>
+                <Image source={{ uri: enrolledPhoto }} style={[styles.thumb, { borderColor: Brand.ink }]} />
+                <ThemedText type="small" color={Brand.muted}>Enrolled</ThemedText>
+              </View>
+            )}
+            <View style={styles.thumbBox}>
+              {lastShot ? (
+                <Image source={{ uri: lastShot.uri }} style={[styles.thumb, { borderColor: s.color }]} />
+              ) : (
+                <View style={[styles.thumb, styles.thumbEmpty]}>
+                  <ThemedText type="small" color={Brand.muted}>…</ThemedText>
+                </View>
+              )}
+              <ThemedText type="small" color={Brand.muted}>Last check</ThemedText>
+            </View>
+          </View>
+
+          <View style={[styles.banner, { borderColor: s.color, backgroundColor: status === 'ok' ? Brand.card : Brand.postit }]}>
             <ThemedText color={status === 'ok' ? Brand.blue : Brand.ink}>{s.label}</ThemedText>
           </View>
+          <ThemedText type="small" color={Brand.muted} style={styles.center}>
+            The camera snaps a photo at random moments to check it&apos;s still you.
+          </ThemedText>
           <BigButton label="Turn off Focus Guard" variant="ghost" tint={Brand.muted} onPress={disable} />
         </>
       )}
 
       {phase === 'error' && (
         <>
-          <ThemedText type="small" color={Brand.accent}>
-            {error || 'Camera unavailable.'}
-          </ThemedText>
+          <ThemedText type="small" color={Brand.accent}>{error || 'Camera unavailable.'}</ThemedText>
           <BigButton label="Try again" variant="ghost" tint={Brand.ink} onPress={enable} />
         </>
       )}
@@ -256,3 +374,39 @@ function friendlyError(e: unknown): string {
   if (name === 'NotFoundError') return 'No camera found on this device.';
   return 'Could not start the camera or load the model. Check your connection and try again.';
 }
+
+const styles = StyleSheet.create({
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pill: { paddingHorizontal: Spacing.two, paddingVertical: 3, ...Wobbly.sm },
+  stage: {
+    height: 210,
+    backgroundColor: '#00000010',
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    overflow: 'hidden',
+    ...Wobbly.md,
+  },
+  guideWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guideOval: {
+    width: '52%',
+    height: '82%',
+    borderWidth: 3,
+    borderStyle: 'dashed',
+    borderRadius: 140,
+  },
+  center: { textAlign: 'center' },
+  btnRow: { flexDirection: 'row', gap: Spacing.two },
+  thumbRow: { flexDirection: 'row', gap: Spacing.three, justifyContent: 'center' },
+  thumbBox: { alignItems: 'center', gap: 4 },
+  thumb: { width: 96, height: 72, borderWidth: 3, ...Wobbly.sm },
+  thumbEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.erased, borderColor: Brand.ink },
+  banner: { borderWidth: 3, padding: Spacing.three, ...Wobbly.md },
+});

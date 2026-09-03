@@ -34,7 +34,7 @@ landing screen shows `Tutor mode: Offline demo`.
 4. Back home → **Open class dashboard** → mastery heatmap + "stuck on fraction comparison —
    here's the misconception to reteach." ← closes the loop
 
-Everything is read aloud (🔊) for low-reading-load, ADHD-friendly focus.
+Everything is read aloud for low-reading-load, ADHD-friendly focus.
 
 ## Going live (Claude + Supabase)
 

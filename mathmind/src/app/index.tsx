@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
+import { Buddy } from '@/components/buddy';
 import { MasteryRing } from '@/components/mastery-ring';
 import { DashedDivider, PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
@@ -43,6 +44,13 @@ export default function Home() {
             <MasteryRing level={overall} size={68} color={Brand.blue} />
           </View>
         </View>
+
+        {/* Milo greets the student — tap him to hear it */}
+        <Buddy
+          mood="happy"
+          message={`Hi ${studentName}! I'm Milo. Tap Start, and talk me through your thinking.`}
+          style={{ marginTop: Spacing.two }}
+        />
 
         {/* Student hero card — taped to the page */}
         <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.hero}>

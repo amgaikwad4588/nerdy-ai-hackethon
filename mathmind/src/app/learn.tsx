@@ -1,21 +1,35 @@
-import * as Speech from 'expo-speech';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
+import { Buddy, type BuddyMood } from '@/components/buddy';
 import { FocusGuard } from '@/components/focus-guard';
 import { MasteryRing } from '@/components/mastery-ring';
 import { PaperBg, SketchSurface, SpeakerIcon, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly } from '@/constants/theme';
 import { SKILLS, SKILL_BY_ID, generateTask } from '@/lib/curriculum';
+import { speak, stopSpeaking } from '@/lib/speak';
 import { MASTERY_THRESHOLD, useStore } from '@/lib/store';
 import { tutorTurn } from '@/lib/tutor';
 import type { Difficulty, Task, TutorResult } from '@/lib/types';
 
 const TASKS_PER_SESSION = 5;
+
+// Milo's between-answers nudges — coaching, kept short for ADHD focus.
+const NUDGES = [
+  "I'm listening — talk me through it.",
+  "What's your first step?",
+  "You've got this. Think it out loud.",
+  'How would you start this one?',
+];
+function nudgeFor(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return NUDGES[Math.abs(h) % NUDGES.length];
+}
 
 // Lowest-mastery skill first — that's where the child needs coaching (and where the
 // interesting misconceptions surface for the demo).
@@ -42,11 +56,6 @@ export default function Learn() {
 
   const skill = task ? SKILL_BY_ID[task.skillId] : null;
 
-  const speak = useCallback((text: string) => {
-    Speech.stop();
-    Speech.speak(text, { rate: 0.95, pitch: 1.05 });
-  }, []);
-
   const nextTask = useCallback(() => {
     const skillId = pickSkillId(useStore.getState().mastery);
     const diff = (useStore.getState().difficulty[skillId] ?? 1) as Difficulty;
@@ -58,12 +67,12 @@ export default function Learn() {
     setResult(null);
     setPhase('answering');
     speak(t.prompt);
-  }, [speak]);
+  }, []);
 
   useEffect(() => {
     nextTask();
     return () => {
-      void Speech.stop();
+      stopSpeaking();
     };
   }, [nextTask]);
 
@@ -94,7 +103,7 @@ export default function Learn() {
     setCount(n);
     if (n >= TASKS_PER_SESSION) {
       setPhase('done');
-      Speech.stop();
+      stopSpeaking();
     } else {
       nextTask();
     }
@@ -137,6 +146,17 @@ export default function Learn() {
   if (!task || !skill) return null;
   const accent = Brand.domain[skill.domain];
 
+  const buddyMood: BuddyMood =
+    phase === 'feedback' && result
+      ? result.isCorrect
+        ? 'cheer'
+        : result.misconceptionTag
+          ? 'thinking'
+          : 'oops'
+      : 'happy';
+  const buddyMessage =
+    phase === 'feedback' && result ? result.message : nudgeFor(task.id);
+
   return (
     <SafeAreaView style={styles.safe}>
       <PaperBg />
@@ -158,6 +178,9 @@ export default function Learn() {
             <MasteryRing level={mastery[skill.id] ?? 0} size={40} color={accent} />
           </View>
         </View>
+
+        {/* Milo guides the child; tap him to hear the line again */}
+        <Buddy mood={buddyMood} message={buddyMessage} onReplay={() => speak(buddyMessage)} />
 
         {/* The single task in focus — taped to the page */}
         <SketchSurface decoration="tape" rotate={-0.75} shadow={6} radius="lg" style={styles.taskCard}>
@@ -224,7 +247,6 @@ export default function Learn() {
             <ThemedText type="smallBold" color={result.isCorrect ? Brand.blue : Brand.accent}>
               {result.isCorrect ? 'Correct!' : result.misconceptionTag ? 'Let’s rethink' : 'Not yet — keep going'}
             </ThemedText>
-            <ThemedText style={{ marginTop: Spacing.one }}>{result.message}</ThemedText>
             {!result.isCorrect && !!result.hint && (
               <ThemedText type="small" style={{ color: Brand.muted, marginTop: Spacing.two }}>
                 Hint: {result.hint}

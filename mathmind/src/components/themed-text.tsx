@@ -1,20 +1,23 @@
-import { Platform, StyleSheet, Text, type TextProps } from 'react-native';
+import { StyleSheet, Text, type TextProps } from 'react-native';
 
-import { Fonts, ThemeColor } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Brand, HandFonts } from '@/constants/theme';
 
 export type ThemedTextProps = TextProps & {
   type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
-  themeColor?: ThemeColor;
+  /** Override the pencil-black default. */
+  color?: string;
 };
 
-export function ThemedText({ style, type = 'default', themeColor, ...rest }: ThemedTextProps) {
-  const theme = useTheme();
-
+/**
+ * All type is handwritten: Kalam (felt-tip marker) for headings and emphasis,
+ * Patrick Hand for body. Weight is baked into the family, so we never set
+ * fontWeight. Default colour is soft pencil black on paper.
+ */
+export function ThemedText({ style, type = 'default', color, ...rest }: ThemedTextProps) {
   return (
     <Text
       style={[
-        { color: theme[themeColor ?? 'text'] },
+        { color: color ?? Brand.ink },
         type === 'default' && styles.default,
         type === 'title' && styles.title,
         type === 'small' && styles.small,
@@ -31,43 +34,12 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
 }
 
 const styles = StyleSheet.create({
-  small: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 500,
-  },
-  smallBold: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: 700,
-  },
-  default: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontWeight: 500,
-  },
-  title: {
-    fontSize: 48,
-    fontWeight: 600,
-    lineHeight: 52,
-  },
-  subtitle: {
-    fontSize: 32,
-    lineHeight: 44,
-    fontWeight: 600,
-  },
-  link: {
-    lineHeight: 30,
-    fontSize: 14,
-  },
-  linkPrimary: {
-    lineHeight: 30,
-    fontSize: 14,
-    color: '#3c87f7',
-  },
-  code: {
-    fontFamily: Fonts.mono,
-    fontWeight: Platform.select({ android: 700 }) ?? 500,
-    fontSize: 12,
-  },
+  default: { fontFamily: HandFonts.body, fontSize: 18, lineHeight: 26 },
+  small: { fontFamily: HandFonts.body, fontSize: 15, lineHeight: 21 },
+  smallBold: { fontFamily: HandFonts.heading, fontSize: 15, lineHeight: 22 },
+  title: { fontFamily: HandFonts.heading, fontSize: 44, lineHeight: 50 },
+  subtitle: { fontFamily: HandFonts.heading, fontSize: 28, lineHeight: 36 },
+  link: { fontFamily: HandFonts.body, fontSize: 15, lineHeight: 26 },
+  linkPrimary: { fontFamily: HandFonts.body, fontSize: 15, lineHeight: 26, color: Brand.blue },
+  code: { fontFamily: 'monospace', fontSize: 13 },
 });

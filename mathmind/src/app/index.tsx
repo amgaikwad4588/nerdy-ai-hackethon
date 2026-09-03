@@ -4,9 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
 import { MasteryRing } from '@/components/mastery-ring';
+import { DashedDivider, PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
-import { DOMAIN_LABEL, SKILLS, SKILL_BY_ID } from '@/lib/curriculum';
+import { DOMAIN_LABEL, SKILLS } from '@/lib/curriculum';
 import { MASTERY_THRESHOLD, useStore } from '@/lib/store';
 import { tutorMode } from '@/lib/tutor';
 
@@ -20,84 +21,93 @@ export default function Home() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PaperBg />
       <ScrollView contentContainerStyle={styles.container}>
+        {/* Masthead — a scribbled title */}
         <View style={styles.headerRow}>
-          <View>
-            <ThemedText type="title" style={styles.brand}>
-              MathMind
-            </ThemedText>
-            <ThemedText style={{ color: Brand.muted }}>
+          <View style={{ flex: 1 }}>
+            <View style={styles.brandRow}>
+              <ThemedText type="title" style={styles.brand}>
+                MathMind
+              </ThemedText>
+              <ThemedText type="title" style={styles.bang}>
+                !
+              </ThemedText>
+            </View>
+            <View style={styles.wavyUnderline} />
+            <ThemedText style={{ color: Brand.muted, marginTop: Spacing.two }}>
               Talk-it-through math for grades 3–5
             </ThemedText>
           </View>
-          <MasteryRing level={overall} size={64} color={Brand.primary} />
+          <View style={{ transform: [{ rotate: '4deg' }] }}>
+            <MasteryRing level={overall} size={68} color={Brand.blue} />
+          </View>
         </View>
 
-        {/* Student entry */}
-        <View style={styles.card}>
-          <ThemedText type="subtitle" style={{ color: Brand.ink }}>
-            Hi {studentName}! 👋
-          </ThemedText>
+        {/* Student hero card — taped to the page */}
+        <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.hero}>
+          <ThemedText type="subtitle">Hi {studentName}! 👋</ThemedText>
           <ThemedText style={{ color: Brand.muted, marginBottom: Spacing.three }}>
             {mastered} of {SKILLS.length} skills mastered · {xp} XP · {streak}🔥 streak
           </ThemedText>
           <BigButton
-            label="Start a 90-second practice"
-            color={Brand.primary}
+            label="Start a 90-second practice ✏️"
+            variant="primary"
             onPress={() => {
               setRole('student');
               router.push('/learn');
             }}
           />
-        </View>
+        </SketchSurface>
 
-        {/* Skill chips */}
-        <ThemedText type="smallBold" style={styles.sectionLabel}>
-          YOUR SKILLS
-        </ThemedText>
+        <StickyTag label="YOUR SKILLS" rotate={-3} style={{ marginTop: Spacing.four }} />
         <View style={styles.skillGrid}>
-          {SKILLS.map((s) => (
-            <View key={s.id} style={styles.skillChip}>
-              <MasteryRing
-                level={mastery[s.id] ?? 0}
-                size={44}
-                color={Brand.domain[s.domain]}
-              />
+          {SKILLS.map((s, i) => (
+            <SketchSurface
+              key={s.id}
+              radius="sm"
+              shadow={3}
+              rotate={i % 2 === 0 ? -1 : 1}
+              style={styles.skillChip}
+            >
+              <MasteryRing level={mastery[s.id] ?? 0} size={46} color={Brand.domain[s.domain]} />
               <View style={{ flex: 1 }}>
-                <ThemedText type="smallBold" style={{ color: Brand.ink }}>
-                  {s.title}
-                </ThemedText>
+                <ThemedText type="smallBold">{s.title}</ThemedText>
                 <ThemedText type="small" style={{ color: Brand.muted }}>
                   {DOMAIN_LABEL[s.domain]}
                 </ThemedText>
               </View>
-            </View>
+            </SketchSurface>
           ))}
         </View>
 
-        {/* Teacher entry */}
-        <View style={[styles.card, { marginTop: Spacing.four }]}>
-          <ThemedText type="smallBold" style={{ color: Brand.ink }}>
-            For teachers
-          </ThemedText>
-          <ThemedText type="small" style={{ color: Brand.muted, marginBottom: Spacing.three }}>
-            See each student's mastery and the misconceptions to reteach.
+        {/* Teacher entry — a pinned post-it */}
+        <SketchSurface
+          tone="postit"
+          decoration="tack"
+          rotate={1}
+          shadow={5}
+          style={{ marginTop: Spacing.five }}
+        >
+          <ThemedText type="smallBold">FOR TEACHERS</ThemedText>
+          <ThemedText type="small" style={{ color: Brand.ink, marginBottom: Spacing.three, marginTop: 2 }}>
+            See each student&apos;s mastery and the exact misconceptions to reteach.
           </ThemedText>
           <BigButton
-            label="Open class dashboard"
+            label="Open class notebook →"
             variant="ghost"
-            color={Brand.ink}
+            tint={Brand.ink}
             onPress={() => {
               setRole('teacher');
               loadDemoData();
               router.push('/teacher');
             }}
           />
-        </View>
+        </SketchSurface>
 
+        <DashedDivider style={{ marginTop: Spacing.five }} />
         <ThemedText type="small" style={styles.footer}>
-          Tutor mode: {tutorMode === 'live' ? 'Live (Claude)' : 'Offline demo'} ·{' '}
-          {SKILL_BY_ID['frac-compare'].code} + 5 more skills
+          Tutor: {tutorMode === 'live' ? 'Live (Claude) ✦' : 'Offline demo ✦'} · 6 skills across 3 domains
         </ThemedText>
       </ScrollView>
     </SafeAreaView>
@@ -105,7 +115,7 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Brand.cream },
+  safe: { flex: 1, backgroundColor: Brand.paper },
   container: {
     padding: Spacing.four,
     gap: Spacing.three,
@@ -117,37 +127,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: Spacing.two,
     marginBottom: Spacing.two,
   },
-  brand: { color: Brand.ink, fontSize: 40, lineHeight: 44 },
-  card: {
-    backgroundColor: Brand.card,
-    borderRadius: 20,
-    padding: Spacing.four,
-    gap: Spacing.one,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
+  brandRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  brand: { fontSize: 46, lineHeight: 50 },
+  bang: {
+    fontSize: 46,
+    lineHeight: 50,
+    color: Brand.accent,
+    transform: [{ rotate: '8deg' }],
+    marginLeft: 2,
   },
-  sectionLabel: {
-    color: Brand.muted,
-    letterSpacing: 1,
-    marginTop: Spacing.three,
-    marginBottom: Spacing.one,
+  wavyUnderline: {
+    height: 4,
+    width: 168,
+    marginTop: 2,
+    backgroundColor: Brand.accent,
+    borderTopLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    transform: [{ rotate: '-1deg' }],
   },
-  skillGrid: { gap: Spacing.two },
+  hero: { marginTop: Spacing.three, gap: Spacing.one },
+  skillGrid: { gap: Spacing.three, marginTop: Spacing.two },
   skillChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
-    backgroundColor: Brand.card,
-    borderRadius: 16,
-    padding: Spacing.three,
   },
-  footer: {
-    textAlign: 'center',
-    color: Brand.muted,
-    marginTop: Spacing.four,
-  },
+  footer: { textAlign: 'center', color: Brand.muted, marginTop: Spacing.two },
 });

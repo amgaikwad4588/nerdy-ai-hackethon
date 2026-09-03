@@ -1,18 +1,14 @@
 import * as Speech from 'expo-speech';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
 import { MasteryRing } from '@/components/mastery-ring';
+import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
-import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly } from '@/constants/theme';
 import { SKILLS, SKILL_BY_ID, generateTask } from '@/lib/curriculum';
 import { MASTERY_THRESHOLD, useStore } from '@/lib/store';
 import { tutorTurn } from '@/lib/tutor';
@@ -40,6 +36,7 @@ export default function Learn() {
   const [result, setResult] = useState<TutorResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [count, setCount] = useState(0);
+  const [focused, setFocused] = useState(false);
   const seed = useRef(Math.floor(Math.random() * 1e9));
 
   const skill = task ? SKILL_BY_ID[task.skillId] : null;
@@ -109,27 +106,28 @@ export default function Learn() {
     const unlocked = (mastery[topSkill] ?? 0) >= MASTERY_THRESHOLD;
     return (
       <SafeAreaView style={styles.safe}>
+        <PaperBg />
         <View style={styles.centered}>
-          <ThemedText type="title" style={{ color: Brand.correct, textAlign: 'center' }}>
-            Great focus! 🎉
-          </ThemedText>
-          <ThemedText style={{ color: Brand.muted, textAlign: 'center', marginVertical: Spacing.three }}>
-            You finished a {TASKS_PER_SESSION}-question set with a {streak}🔥 streak.
-            {unlocked ? ' You unlocked a game!' : ' Keep going to unlock a game.'}
-          </ThemedText>
-          <BigButton
-            label="Play Number Line Dash 🏁"
-            color={Brand.spark}
-            onPress={() => router.replace('/game')}
-            style={{ alignSelf: 'stretch' }}
-          />
-          <BigButton
-            label="Back home"
-            variant="ghost"
-            color={Brand.ink}
-            onPress={() => router.replace('/')}
-            style={{ alignSelf: 'stretch', marginTop: Spacing.three }}
-          />
+          <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={{ gap: Spacing.two }}>
+            <ThemedText type="title" style={{ color: Brand.blue, textAlign: 'center' }}>
+              Great focus! 🎉
+            </ThemedText>
+            <ThemedText style={{ color: Brand.muted, textAlign: 'center', marginBottom: Spacing.two }}>
+              You finished {TASKS_PER_SESSION} questions with a {streak}🔥 streak.
+              {unlocked ? ' You unlocked a game!' : ' Keep going to unlock a game.'}
+            </ThemedText>
+            <BigButton
+              label="Play Number Line Dash 🏁"
+              variant="primary"
+              onPress={() => router.replace('/game')}
+            />
+            <BigButton
+              label="Back home"
+              variant="ghost"
+              tint={Brand.ink}
+              onPress={() => router.replace('/')}
+            />
+          </SketchSurface>
         </View>
       </SafeAreaView>
     );
@@ -140,27 +138,31 @@ export default function Learn() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PaperBg />
       <View style={styles.container}>
-        {/* Progress + one skill in focus */}
+        {/* Progress + the one skill in focus */}
         <View style={styles.topRow}>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%`, backgroundColor: accent }]} />
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${Math.max(6, progress * 100)}%`, backgroundColor: accent },
+              ]}
+            />
           </View>
-          <MasteryRing level={mastery[skill.id] ?? 0} size={40} color={accent} />
+          <View style={{ transform: [{ rotate: '3deg' }] }}>
+            <MasteryRing level={mastery[skill.id] ?? 0} size={42} color={accent} />
+          </View>
         </View>
-        <ThemedText type="small" style={{ color: Brand.muted }}>
-          {skill.title} · Level {difficulty[skill.id] ?? 1}
-        </ThemedText>
+        <StickyTag label={`${skill.title.toUpperCase()} · LVL ${difficulty[skill.id] ?? 1}`} rotate={-2} />
 
-        {/* The single task in focus */}
-        <View style={styles.taskCard}>
+        {/* The single task in focus — taped to the page */}
+        <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.taskCard}>
           <Pressable onPress={() => speak(task.prompt)} style={styles.speaker} hitSlop={12}>
-            <ThemedText style={{ fontSize: 22 }}>🔊</ThemedText>
+            <ThemedText style={{ fontSize: 20 }}>🔊</ThemedText>
           </Pressable>
-          <ThemedText type="subtitle" style={styles.prompt}>
-            {task.prompt}
-          </ThemedText>
-        </View>
+          <ThemedText style={styles.prompt}>{task.prompt}</ThemedText>
+        </SketchSurface>
 
         {phase === 'answering' && (
           <>
@@ -171,7 +173,7 @@ export default function Learn() {
                     key={c}
                     label={c}
                     variant="ghost"
-                    color={accent}
+                    tint={accent}
                     disabled={busy}
                     onPress={() => submit(c === 'They are equal' ? 'theyareequal' : c)}
                   />
@@ -184,20 +186,26 @@ export default function Learn() {
                   onChangeText={setAnswer}
                   keyboardType="numbers-and-punctuation"
                   placeholder="Your answer"
-                  placeholderTextColor={Brand.muted}
-                  style={styles.input}
+                  placeholderTextColor={`${Brand.ink}66`}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  style={[
+                    styles.input,
+                    Wobbly.md,
+                    { borderColor: focused ? Brand.blue : Brand.ink },
+                  ]}
                   editable={!busy}
                   onSubmitEditing={() => submit()}
                 />
-                <BigButton label={busy ? 'Thinking…' : 'Check it'} color={accent} disabled={busy} onPress={() => submit()} />
+                <BigButton label={busy ? 'Thinking…' : 'Check it ✓'} variant="primary" disabled={busy} onPress={() => submit()} />
               </>
             )}
             <TextInput
               value={thinking}
               onChangeText={setThinking}
               placeholder="Optional: how did you figure it out?"
-              placeholderTextColor={Brand.muted}
-              style={styles.thinkingInput}
+              placeholderTextColor={`${Brand.ink}55`}
+              style={[styles.thinkingInput, Wobbly.sm]}
               editable={!busy}
               multiline
             />
@@ -205,18 +213,15 @@ export default function Learn() {
         )}
 
         {phase === 'feedback' && result && (
-          <View
-            style={[
-              styles.feedback,
-              { borderColor: result.isCorrect ? Brand.correct : Brand.gentle },
-            ]}
+          <SketchSurface
+            radius="md"
+            shadow={5}
+            style={{ borderColor: result.isCorrect ? Brand.blue : Brand.accent, borderWidth: 3 }}
           >
-            <ThemedText type="smallBold" style={{ color: result.isCorrect ? Brand.correct : Brand.gentle }}>
-              {result.isCorrect ? 'Correct! ✅' : result.misconceptionTag ? 'Let’s rethink 🤔' : 'Not yet — keep going'}
+            <ThemedText type="smallBold" color={result.isCorrect ? Brand.blue : Brand.accent}>
+              {result.isCorrect ? 'Correct! ✓' : result.misconceptionTag ? 'Let’s rethink 🤔' : 'Not yet — keep going'}
             </ThemedText>
-            <ThemedText style={{ color: Brand.ink, marginTop: Spacing.one }}>
-              {result.message}
-            </ThemedText>
+            <ThemedText style={{ marginTop: Spacing.one }}>{result.message}</ThemedText>
             {!result.isCorrect && !!result.hint && (
               <ThemedText type="small" style={{ color: Brand.muted, marginTop: Spacing.two }}>
                 Hint: {result.hint}
@@ -227,19 +232,19 @@ export default function Learn() {
                 <BigButton
                   label="Try again"
                   variant="ghost"
-                  color={accent}
+                  tint={accent}
                   onPress={() => setPhase('answering')}
                   style={{ flex: 1 }}
                 />
               )}
               <BigButton
                 label={result.isCorrect ? 'Next →' : 'Skip →'}
-                color={accent}
+                variant="primary"
                 onPress={advance}
                 style={{ flex: 1 }}
               />
             </View>
-          </View>
+          </SketchSurface>
         )}
       </View>
     </SafeAreaView>
@@ -247,7 +252,7 @@ export default function Learn() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Brand.cream },
+  safe: { flex: 1, backgroundColor: Brand.paper },
   container: {
     flex: 1,
     padding: Spacing.four,
@@ -256,53 +261,59 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
   },
-  centered: { flex: 1, justifyContent: 'center', padding: Spacing.four },
+  centered: { flex: 1, justifyContent: 'center', padding: Spacing.four, maxWidth: MaxContentWidth, width: '100%', alignSelf: 'center' },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   progressTrack: {
     flex: 1,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#E7E2D6',
+    height: 16,
+    borderRadius: 9,
+    backgroundColor: Brand.card,
+    borderWidth: 2,
+    borderColor: Brand.ink,
     overflow: 'hidden',
+    padding: 2,
   },
-  progressFill: { height: '100%', borderRadius: 5 },
-  taskCard: {
-    backgroundColor: Brand.card,
-    borderRadius: 20,
-    padding: Spacing.four,
-    minHeight: 140,
+  progressFill: { height: '100%', borderRadius: 6 },
+  taskCard: { minHeight: 150, justifyContent: 'center' },
+  speaker: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-  },
-  speaker: { position: 'absolute', top: Spacing.three, right: Spacing.three },
-  prompt: { color: Brand.ink, textAlign: 'center', fontSize: 26, lineHeight: 34 },
-  input: {
     backgroundColor: Brand.card,
-    borderRadius: 16,
-    padding: Spacing.three,
-    fontSize: 22,
+  },
+  prompt: {
+    fontFamily: HandFonts.heading,
     color: Brand.ink,
     textAlign: 'center',
-    borderWidth: 2,
-    borderColor: '#E7E2D6',
+    fontSize: 30,
+    lineHeight: 40,
+    paddingHorizontal: Spacing.three,
+  },
+  input: {
+    backgroundColor: Brand.card,
+    padding: Spacing.three,
+    fontFamily: HandFonts.body,
+    fontSize: 24,
+    color: Brand.ink,
+    textAlign: 'center',
+    borderWidth: 3,
   },
   thinkingInput: {
-    backgroundColor: '#FFFDF8',
-    borderRadius: 14,
+    backgroundColor: Brand.postit,
     padding: Spacing.three,
-    fontSize: 15,
+    fontFamily: HandFonts.body,
+    fontSize: 16,
     color: Brand.ink,
-    borderWidth: 1,
-    borderColor: '#EFE9DC',
-    minHeight: 48,
-  },
-  feedback: {
-    backgroundColor: Brand.card,
-    borderRadius: 18,
-    padding: Spacing.four,
     borderWidth: 2,
+    borderColor: Brand.ink,
+    borderStyle: 'dashed',
+    minHeight: 52,
   },
 });

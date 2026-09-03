@@ -30,8 +30,10 @@ export function MasteryRing({
           cx={size / 2}
           cy={size / 2}
           r={r}
-          stroke="#E7E2D6"
+          stroke={Brand.erased}
           strokeWidth={stroke}
+          strokeDasharray="2 4"
+          strokeLinecap="round"
           fill="none"
         />
         <Circle

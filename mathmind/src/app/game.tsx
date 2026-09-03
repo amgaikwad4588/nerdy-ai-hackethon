@@ -4,6 +4,7 @@ import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
+import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useStore } from '@/lib/store';
@@ -75,14 +76,17 @@ export default function Game() {
   if (round >= ROUNDS) {
     return (
       <SafeAreaView style={styles.safe}>
+        <PaperBg />
         <View style={styles.centered}>
-          <ThemedText type="title" style={{ color: Brand.spark, textAlign: 'center' }}>
-            {score}/{ROUNDS} 🏁
-          </ThemedText>
-          <ThemedText style={{ color: Brand.muted, textAlign: 'center', marginVertical: Spacing.three }}>
-            {score >= 5 ? 'Number line master!' : 'Nice dashing — your aim is getting sharper.'}
-          </ThemedText>
-          <BigButton label="Back home" color={Brand.primary} onPress={() => router.replace('/')} style={{ alignSelf: 'stretch' }} />
+          <SketchSurface decoration="tack" rotate={-1} shadow={6} radius="lg" style={{ gap: Spacing.two }}>
+            <ThemedText type="title" style={{ color: Brand.accent, textAlign: 'center' }}>
+              {score}/{ROUNDS} 🏁
+            </ThemedText>
+            <ThemedText style={{ color: Brand.muted, textAlign: 'center', marginBottom: Spacing.two }}>
+              {score >= 5 ? 'Number line master!' : 'Nice dashing — your aim is getting sharper.'}
+            </ThemedText>
+            <BigButton label="Back home" variant="primary" onPress={() => router.replace('/')} />
+          </SketchSurface>
         </View>
       </SafeAreaView>
     );
@@ -93,10 +97,9 @@ export default function Game() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <PaperBg />
       <View style={styles.container}>
-        <ThemedText type="small" style={{ color: Brand.muted, textAlign: 'center' }}>
-          Round {round + 1} of {ROUNDS} · Score {score}
-        </ThemedText>
+        <StickyTag label={`ROUND ${round + 1} / ${ROUNDS} · SCORE ${score}`} rotate={-2} style={{ alignSelf: 'center' }} />
         <ThemedText type="title" style={styles.target}>
           Tap {target}
         </ThemedText>
@@ -104,37 +107,32 @@ export default function Game() {
           on the line from 0 to {MAX}
         </ThemedText>
 
-        <View style={styles.lineWrap}>
+        <SketchSurface radius="md" shadow={5} rotate={-0.5} style={styles.pad}>
           <Pressable onPress={onLine} onLayout={onLayout} style={styles.line}>
             <View style={styles.lineBar} />
-            {/* endpoints */}
             <ThemedText style={[styles.endLabel, { left: 0 }]}>0</ThemedText>
             <ThemedText style={[styles.endLabel, { right: 0 }]}>{MAX}</ThemedText>
-            {/* the runner's guess */}
             {markerPct != null && (
               <View
                 style={[
                   styles.marker,
                   {
                     left: `${markerPct}%`,
-                    backgroundColor: feedback === 'hit' ? Brand.correct : Brand.gentle,
+                    backgroundColor: feedback === 'hit' ? Brand.blue : Brand.accent,
                   },
                 ]}
               />
             )}
-            {/* reveal the true spot after a guess */}
-            {feedback && (
-              <View style={[styles.trueMark, { left: `${targetPct}%` }]} />
-            )}
+            {feedback && <View style={[styles.trueMark, { left: `${targetPct}%` }]} />}
           </Pressable>
-        </View>
+        </SketchSurface>
 
         {feedback && (
           <View style={styles.feedbackRow}>
-            <ThemedText type="smallBold" style={{ color: feedback === 'hit' ? Brand.correct : Brand.gentle }}>
+            <ThemedText type="smallBold" color={feedback === 'hit' ? Brand.blue : Brand.accent}>
               {feedback === 'hit' ? 'Bullseye! 🎯' : `Off by ${Math.round(Math.abs((marker ?? 0) - target))}`}
             </ThemedText>
-            <BigButton label="Next →" color={Brand.spark} onPress={next} />
+            <BigButton label="Next →" variant="primary" onPress={next} />
           </View>
         )}
       </View>
@@ -143,7 +141,7 @@ export default function Game() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Brand.cream },
+  safe: { flex: 1, backgroundColor: Brand.paper },
   container: {
     flex: 1,
     padding: Spacing.four,
@@ -153,28 +151,41 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     justifyContent: 'center',
   },
-  centered: { flex: 1, justifyContent: 'center', padding: Spacing.four },
-  target: { color: Brand.ink, textAlign: 'center', fontSize: 52, lineHeight: 58 },
-  lineWrap: { paddingVertical: Spacing.five },
+  centered: { flex: 1, justifyContent: 'center', padding: Spacing.four, maxWidth: MaxContentWidth, width: '100%', alignSelf: 'center' },
+  target: { color: Brand.ink, textAlign: 'center', fontSize: 52, lineHeight: 58, marginTop: Spacing.two },
+  pad: { paddingVertical: Spacing.five },
   line: { height: 64, justifyContent: 'center' },
-  lineBar: { height: 8, borderRadius: 4, backgroundColor: '#D9D2C4' },
-  endLabel: { position: 'absolute', top: -4, color: Brand.muted, fontSize: 13 },
+  lineBar: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Brand.ink,
+    borderTopLeftRadius: 6,
+    borderBottomRightRadius: 6,
+  },
+  endLabel: {
+    position: 'absolute',
+    top: -6,
+    color: Brand.muted,
+    fontSize: 14,
+    fontFamily: 'PatrickHand_400Regular',
+  },
   marker: {
     position: 'absolute',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    marginLeft: -9,
-    borderWidth: 3,
-    borderColor: '#fff',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    marginLeft: -10,
+    borderWidth: 2,
+    borderColor: Brand.ink,
   },
   trueMark: {
     position: 'absolute',
-    width: 3,
-    height: 34,
-    marginLeft: -1.5,
-    backgroundColor: Brand.correct,
-    borderRadius: 2,
+    width: 0,
+    height: 40,
+    marginLeft: -1,
+    borderLeftWidth: 3,
+    borderStyle: 'dashed',
+    borderColor: Brand.blue,
   },
   feedbackRow: {
     flexDirection: 'row',

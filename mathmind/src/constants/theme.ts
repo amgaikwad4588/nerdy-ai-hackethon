@@ -27,26 +27,87 @@ export const Colors = {
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
 /**
- * MathMind brand palette. Warm, focused, and high-contrast — friendly enough for a
- * grade 3-5 learner, calm enough to keep an ADHD single-task screen low-distraction.
- * Deliberately not AI-slop (no purple mesh gradients / generic glassmorphism).
+ * MathMind "Hand-Drawn" palette — notebook paper, pencil lead, correction marker,
+ * and ballpoint blue. Limited on purpose: pencil black, paper white, red, blue,
+ * post-it yellow. Semantics for this app: BLUE = correct / mastery, RED = "let's
+ * rethink" (a correction-marker note, never scary), YELLOW = highlights.
+ * Keys keep their old names so screens inherit the restyle without churn.
  */
 export const Brand = {
-  primary: '#2F6FED', // calm confident blue — actions, focus
-  primaryDark: '#1E4FB8',
-  ink: '#16233B', // near-navy text
-  correct: '#1FA971', // green — mastery, "yes"
-  gentle: '#F4A62A', // amber — nudge, "not yet" (never harsh red for kids)
-  spark: '#F26D5B', // coral accent — rewards, streaks
-  cream: '#FBF7EF', // warm off-white canvas
-  card: '#FFFFFF',
-  muted: '#6B7687',
+  primary: '#2d5da1', // blue ballpoint — primary actions, focus
+  primaryDark: '#1f4576',
+  ink: '#2d2d2d', // soft pencil black (never pure black)
+  correct: '#2d5da1', // blue tick — right answers, mastery
+  gentle: '#ff4d4d', // correction-marker red — nudge / "not yet"
+  spark: '#ff4d4d', // marker red — rewards, streaks, accents
+  cream: '#fdfbf7', // warm paper canvas
+  card: '#ffffff',
+  muted: '#6f6a60', // faded pencil gray
+  paper: '#fdfbf7',
+  accent: '#ff4d4d', // red correction marker
+  blue: '#2d5da1', // blue ballpoint pen
+  postit: '#fff9c4', // post-it yellow
+  erased: '#e5e0d8', // old paper / erased pencil
   domain: {
-    'base-ten': '#2F6FED',
-    operations: '#7A5AF8',
-    fractions: '#1FA971',
+    // three ink colours (ballpoint / pencil / marker) rather than a rainbow
+    'base-ten': '#2d5da1',
+    operations: '#2d2d2d',
+    fractions: '#ff4d4d',
   } as Record<string, string>,
 } as const;
+
+/**
+ * Handwritten type. Kalam (marker) for headings, Patrick Hand for body. These family
+ * names are the ones @expo-google-fonts registers once useFonts() resolves.
+ */
+export const HandFonts = {
+  heading: 'Kalam_700Bold',
+  headingAlt: 'Kalam_400Regular',
+  body: 'PatrickHand_400Regular',
+} as const;
+
+/**
+ * Wobbly, hand-drawn corners. RN can't express the elliptical `255px 15px / …`
+ * syntax, so we asymmetrically vary each corner — the same "no straight lines"
+ * intent, expressed cross-platform. Spread onto a View's style.
+ */
+export const Wobbly = {
+  sm: {
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 6,
+    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 8,
+  },
+  md: {
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 10,
+    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 12,
+  },
+  lg: {
+    borderTopLeftRadius: 42,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 40,
+    borderBottomLeftRadius: 18,
+  },
+  // button oval — pill-ish but lopsided
+  pill: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 26,
+    borderBottomLeftRadius: 18,
+  },
+} as const;
+
+/**
+ * Hard offset shadow (cut-paper look) — a solid offset with NO blur, exactly as the
+ * design spec calls for (`4px 4px 0px #2d2d2d`). RN 0.76+ / react-native-web support
+ * `boxShadow` as a real cross-platform style prop, so this renders identically on web
+ * and native. Pass the offset size and colour.
+ */
+export function offsetShadow(size = 4, color = '#2d2d2d') {
+  return { boxShadow: `${size}px ${size}px 0px ${color}` } as const;
+}
 
 export const Fonts = Platform.select({
   ios: {

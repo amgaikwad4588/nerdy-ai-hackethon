@@ -46,12 +46,12 @@ export default function Home() {
 
         {/* Student hero card — taped to the page */}
         <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.hero}>
-          <ThemedText type="subtitle">Hi {studentName}! 👋</ThemedText>
+          <ThemedText type="subtitle">Hi {studentName}!</ThemedText>
           <ThemedText style={{ color: Brand.muted, marginBottom: Spacing.three }}>
-            {mastered} of {SKILLS.length} skills mastered · {xp} XP · {streak}🔥 streak
+            {mastered} of {SKILLS.length} skills mastered · {xp} XP · {streak} day streak
           </ThemedText>
           <BigButton
-            label="Start a 90-second practice ✏️"
+            label="Start a 90-second practice"
             variant="primary"
             onPress={() => {
               setRole('student');
@@ -94,7 +94,7 @@ export default function Home() {
             See each student&apos;s mastery and the exact misconceptions to reteach.
           </ThemedText>
           <BigButton
-            label="Open class notebook →"
+            label="Open class notebook"
             variant="ghost"
             tint={Brand.ink}
             onPress={() => {
@@ -107,7 +107,7 @@ export default function Home() {
 
         <DashedDivider style={{ marginTop: Spacing.five }} />
         <ThemedText type="small" style={styles.footer}>
-          Tutor: {tutorMode === 'live' ? 'Live (Claude) ✦' : 'Offline demo ✦'} · 6 skills across 3 domains
+          Tutor: {tutorMode === 'live' ? 'Live (Claude)' : 'Offline demo'} · 6 skills across 3 domains
         </ThemedText>
       </ScrollView>
     </SafeAreaView>

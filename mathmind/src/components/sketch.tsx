@@ -4,10 +4,27 @@
 
 import { useId } from 'react';
 import { StyleSheet, View, type ViewProps, type ViewStyle } from 'react-native';
-import Svg, { Circle, Defs, Pattern, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, Pattern, Polygon, Rect } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
-import { Brand, HandFonts, offsetShadow, Wobbly } from '@/constants/theme';
+import { Brand, offsetShadow, Wobbly } from '@/constants/theme';
+
+/** Hand-drawn speaker glyph (read-aloud affordance) — replaces the 🔊 emoji. */
+export function SpeakerIcon({ size = 20, color = Brand.ink }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Polygon
+        points="4,9 8,9 13,5 13,19 8,15 4,15"
+        fill={color}
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <Path d="M16 9 C18 11, 18 13, 16 15" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+      <Path d="M18.5 7 C21.5 10, 21.5 14, 18.5 17" stroke={color} strokeWidth={2.2} strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 /** Full-bleed notebook dot grid, drawn behind screen content. */
 export function PaperBg() {

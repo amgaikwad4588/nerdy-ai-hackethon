@@ -94,7 +94,7 @@ export default function Teacher() {
         />
         {openEvents.length === 0 && (
           <ThemedText type="small" style={{ color: Brand.muted, marginTop: Spacing.two }}>
-            Nothing flagged. 🎉
+            Nothing flagged right now.
           </ThemedText>
         )}
         <View style={{ gap: Spacing.three, marginTop: Spacing.two }}>
@@ -112,7 +112,7 @@ export default function Teacher() {
                     {mc?.description}
                   </ThemedText>
                   <ThemedText type="small" color={Brand.blue} style={{ marginTop: Spacing.one }}>
-                    ✎ Reteach: {mc?.remediation}
+                    Reteach: {mc?.remediation}
                   </ThemedText>
                 </View>
               </SketchSurface>

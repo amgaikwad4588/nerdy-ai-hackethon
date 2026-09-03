@@ -1,140 +1,311 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
-import { LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
-import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly, offsetShadow } from '@/constants/theme';
 import { useStore } from '@/lib/store';
+import type { Difficulty } from '@/lib/types';
 
-// Number Line Dash: an adaptive magnitude/place-value game. Tap where the target
-// number sits on the line. A correct-enough tap advances the runner. It's a reward
-// that is *also* practice — every round emits a mastery signal for place value.
+// Math Sprint: a fast, competitive arithmetic race. Answer as many as you can before
+// the timer runs out; a combo multiplier rewards streaks. You race a class leaderboard
+// live, and see your rank at the end. Every correct answer feeds a mastery signal.
 
-const ROUNDS = 6;
-const MAX = 100;
+const SPRINT_SECONDS = 30;
+const ROUND_MS = { hit: 160, miss: 420 };
+
+// The rest of the class you're racing. Their scores get a little jitter each round.
+const CLASSMATES = [
+  { name: 'Maya', base: 280 },
+  { name: 'Zara', base: 240 },
+  { name: 'Leo', base: 200 },
+  { name: 'Ada', base: 170 },
+  { name: 'Kai', base: 140 },
+];
+
+interface Problem {
+  prompt: string;
+  answer: number;
+  choices: number[];
+}
+
+const rnd = (n: number) => Math.floor(Math.random() * n);
+
+function makeChoices(answer: number): number[] {
+  const set = new Set<number>([answer]);
+  while (set.size < 4) {
+    const delta = rnd(9) + 1;
+    const cand = answer + (Math.random() < 0.5 ? -delta : delta);
+    if (cand >= 0) set.add(cand);
+  }
+  return [...set].sort(() => Math.random() - 0.5);
+}
+
+function makeProblem(diff: Difficulty): Problem {
+  const ops = diff >= 2 ? (['+', '-', '×'] as const) : (['+', '×'] as const);
+  const op = ops[rnd(ops.length)];
+  let a: number, b: number, answer: number;
+  if (op === '×') {
+    const hi = [6, 9, 12][diff - 1];
+    a = 2 + rnd(hi - 1);
+    b = 2 + rnd(hi - 1);
+    answer = a * b;
+  } else if (op === '+') {
+    const cap = [20, 50, 100][diff - 1];
+    a = 1 + rnd(cap);
+    b = 1 + rnd(cap);
+    answer = a + b;
+  } else {
+    const cap = [20, 50, 100][diff - 1];
+    a = 1 + rnd(cap);
+    b = 1 + rnd(a); // keep it non-negative
+    answer = a - b;
+  }
+  return { prompt: `${a} ${op} ${b}`, answer, choices: makeChoices(answer) };
+}
 
 export default function Game() {
   const router = useRouter();
+  const studentName = useStore((s) => s.studentName);
+  const diff = (useStore((s) => s.difficulty['mult-facts']) ?? 1) as Difficulty;
   const recordTurn = useStore((s) => s.recordTurn);
 
-  const targets = useMemo(
-    () => Array.from({ length: ROUNDS }, () => 5 + Math.floor(Math.random() * (MAX - 10))),
-    [],
+  const [phase, setPhase] = useState<'ready' | 'playing' | 'over'>('ready');
+  const [problem, setProblem] = useState<Problem>(() => makeProblem(diff));
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [best, setBest] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(SPRINT_SECONDS);
+  const [flash, setFlash] = useState<{ index: number; ok: boolean } | null>(null);
+  const locked = useRef(false);
+
+  // Fixed classmate scores for this round.
+  const rivals = useMemo(
+    () => CLASSMATES.map((c) => ({ name: c.name, score: Math.max(0, c.base + rnd(61) - 30) })),
+    [phase === 'ready'], // re-roll each time we return to the ready screen
   );
 
-  const [round, setRound] = useState(0);
-  const [score, setScore] = useState(0);
-  const [lineWidth, setLineWidth] = useState(0);
-  const [marker, setMarker] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState<'hit' | 'miss' | null>(null);
+  const rank = 1 + rivals.filter((r) => r.score > score).length;
 
-  const target = targets[round];
-  const tolerance = MAX * 0.07; // generous for young learners
+  // Countdown.
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    const id = setInterval(() => {
+      setTimeLeft((t) => {
+        if (t <= 1) {
+          clearInterval(id);
+          setBest((b) => Math.max(b, score));
+          setPhase('over');
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, score]);
 
-  const onLine = useCallback(
-    (e: { nativeEvent: { locationX: number } }) => {
-      if (feedback || lineWidth === 0) return;
-      const x = Math.max(0, Math.min(lineWidth, e.nativeEvent.locationX));
-      const value = (x / lineWidth) * MAX;
-      const hit = Math.abs(value - target) <= tolerance;
-      setMarker(value);
-      setFeedback(hit ? 'hit' : 'miss');
-      if (hit) setScore((s) => s + 1);
+  const start = useCallback(() => {
+    setScore(0);
+    setCombo(0);
+    setTimeLeft(SPRINT_SECONDS);
+    setProblem(makeProblem(diff));
+    setFlash(null);
+    locked.current = false;
+    setPhase('playing');
+  }, [diff]);
 
+  function answer(index: number) {
+    if (locked.current || phase !== 'playing') return;
+    const chosen = problem.choices[index];
+    const ok = chosen === problem.answer;
+    locked.current = true;
+    setFlash({ index, ok });
+
+    if (ok) {
+      setScore((s) => s + 10 + combo * 2); // streaks pay off
+      setCombo((c) => c + 1);
       recordTurn({
-        id: `game-${round}-${Date.now()}`,
+        id: `sprint-${Date.now()}`,
         at: Date.now(),
-        skillId: 'place-value',
-        taskId: `dash-${round}`,
-        studentAnswer: String(Math.round(value)),
+        skillId: 'mult-facts',
+        taskId: 'sprint',
+        studentAnswer: String(chosen),
         result: {
-          isCorrect: hit,
-          isOnTrack: hit,
+          isCorrect: true,
+          isOnTrack: true,
           misconceptionTag: null,
           message: '',
           hint: '',
           difficultyDelta: 0,
-          masterySignal: hit ? 0.9 : 0.3,
+          masterySignal: 0.8,
         },
       });
-    },
-    [feedback, lineWidth, target, tolerance, round, recordTurn],
-  );
+    } else {
+      setCombo(0);
+    }
 
-  function next() {
-    setMarker(null);
-    setFeedback(null);
-    if (round + 1 >= ROUNDS) setRound(ROUNDS);
-    else setRound((r) => r + 1);
+    setTimeout(() => {
+      setFlash(null);
+      setProblem(makeProblem(diff));
+      locked.current = false;
+    }, ok ? ROUND_MS.hit : ROUND_MS.miss);
   }
 
-  const onLayout = (e: LayoutChangeEvent) => setLineWidth(e.nativeEvent.layout.width);
+  // ---- READY ----------------------------------------------------------------
+  if (phase === 'ready') {
+    const board = [...rivals].sort((a, b) => b.score - a.score);
+    return (
+      <SafeAreaView style={styles.safe}>
+        <PaperBg />
+        <View style={styles.container}>
+          <StickyTag label="MATH SPRINT" rotate={-3} style={{ alignSelf: 'center' }} />
+          <ThemedText type="title" style={styles.bigTitle}>
+            Beat the class!
+          </ThemedText>
+          <ThemedText type="small" style={styles.center}>
+            Answer as many as you can in {SPRINT_SECONDS} seconds. Streaks score extra.
+          </ThemedText>
 
-  if (round >= ROUNDS) {
+          <SketchSurface radius="md" shadow={5} rotate={-0.5} style={{ marginTop: Spacing.two }}>
+            <ThemedText type="smallBold" style={{ marginBottom: Spacing.two }}>
+              TODAY&apos;S CLASS SCORES
+            </ThemedText>
+            {board.map((r, i) => (
+              <View key={r.name} style={styles.boardRow}>
+                <ThemedText type="smallBold" color={Brand.muted}>#{i + 1}</ThemedText>
+                <ThemedText style={{ flex: 1 }}>{r.name}</ThemedText>
+                <ThemedText type="smallBold">{r.score}</ThemedText>
+              </View>
+            ))}
+          </SketchSurface>
+
+          {best > 0 && (
+            <ThemedText type="small" style={styles.center}>
+              Your best so far: {best}
+            </ThemedText>
+          )}
+          <BigButton label="Start sprint" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
+          <BigButton label="Back home" variant="ghost" tint={Brand.ink} onPress={() => router.replace('/')} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ---- OVER -----------------------------------------------------------------
+  if (phase === 'over') {
+    const board = [...rivals, { name: `${studentName} (you)`, score, you: true }].sort(
+      (a, b) => b.score - a.score,
+    );
+    const myRank = board.findIndex((r) => (r as { you?: boolean }).you) + 1;
+    const medal = myRank === 1 ? 'first' : myRank === 2 ? 'second' : myRank === 3 ? 'third' : '';
     return (
       <SafeAreaView style={styles.safe}>
         <PaperBg />
         <View style={styles.centered}>
           <SketchSurface decoration="tack" rotate={-1} shadow={6} radius="lg" style={{ gap: Spacing.two }}>
-            <ThemedText type="title" style={{ color: Brand.accent, textAlign: 'center' }}>
-              {score}/{ROUNDS} 🏁
+            <ThemedText type="smallBold" color={Brand.muted} style={styles.center}>
+              TIME&apos;S UP
             </ThemedText>
-            <ThemedText style={{ color: Brand.muted, textAlign: 'center', marginBottom: Spacing.two }}>
-              {score >= 5 ? 'Number line master!' : 'Nice dashing — your aim is getting sharper.'}
+            <ThemedText type="title" style={[styles.bigTitle, { color: Brand.blue }]}>
+              {score} pts
             </ThemedText>
-            <BigButton label="Back home" variant="primary" onPress={() => router.replace('/')} />
+            <View style={styles.rankBadge}>
+              <ThemedText type="smallBold" color="#fff" style={{ fontSize: 18 }}>
+                You ranked #{myRank} of {board.length}
+                {medal ? ` — ${medal} place` : ''}
+              </ThemedText>
+            </View>
+
+            <View style={{ marginTop: Spacing.two }}>
+              {board.map((r, i) => {
+                const you = (r as { you?: boolean }).you;
+                return (
+                  <View
+                    key={r.name}
+                    style={[
+                      styles.boardRow,
+                      you && styles.youRow,
+                    ]}
+                  >
+                    <ThemedText type="smallBold" color={you ? Brand.accent : Brand.muted}>
+                      #{i + 1}
+                    </ThemedText>
+                    <ThemedText style={{ flex: 1 }} color={you ? Brand.accent : Brand.ink}>
+                      {r.name}
+                    </ThemedText>
+                    <ThemedText type="smallBold" color={you ? Brand.accent : Brand.ink}>
+                      {r.score}
+                    </ThemedText>
+                  </View>
+                );
+              })}
+            </View>
+
+            <BigButton label="Race again" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
+            <BigButton label="Back home" variant="ghost" tint={Brand.ink} onPress={() => router.replace('/')} />
           </SketchSurface>
         </View>
       </SafeAreaView>
     );
   }
 
-  const targetPct = (target / MAX) * 100;
-  const markerPct = marker != null ? (marker / MAX) * 100 : null;
-
+  // ---- PLAYING --------------------------------------------------------------
+  const timePct = timeLeft / SPRINT_SECONDS;
+  const low = timeLeft <= 10;
   return (
     <SafeAreaView style={styles.safe}>
       <PaperBg />
       <View style={styles.container}>
-        <StickyTag label={`ROUND ${round + 1} / ${ROUNDS} · SCORE ${score}`} rotate={-2} style={{ alignSelf: 'center' }} />
-        <ThemedText type="title" style={styles.target}>
-          Tap {target}
-        </ThemedText>
-        <ThemedText type="small" style={{ color: Brand.muted, textAlign: 'center' }}>
-          on the line from 0 to {MAX}
-        </ThemedText>
+        {/* Timer + live rank */}
+        <View style={styles.topRow}>
+          <View style={styles.timerTrack}>
+            <View
+              style={[
+                styles.timerFill,
+                { width: `${Math.max(2, timePct * 100)}%`, backgroundColor: low ? Brand.accent : Brand.blue },
+              ]}
+            />
+          </View>
+          <View style={[styles.rankPill, { transform: [{ rotate: '2deg' }] }]}>
+            <ThemedText type="smallBold" color="#fff">Rank #{rank}</ThemedText>
+          </View>
+        </View>
 
-        <SketchSurface radius="md" shadow={5} rotate={-0.5} style={styles.pad}>
-          <Pressable onPress={onLine} onLayout={onLayout} style={styles.line}>
-            <View style={styles.lineBar} />
-            <ThemedText style={[styles.endLabel, { left: 0 }]}>0</ThemedText>
-            <ThemedText style={[styles.endLabel, { right: 0 }]}>{MAX}</ThemedText>
-            {markerPct != null && (
-              <View
-                style={[
-                  styles.marker,
-                  {
-                    left: `${markerPct}%`,
-                    backgroundColor: feedback === 'hit' ? Brand.blue : Brand.accent,
-                  },
-                ]}
-              />
-            )}
-            {feedback && <View style={[styles.trueMark, { left: `${targetPct}%` }]} />}
-          </Pressable>
+        <View style={styles.scoreRow}>
+          <ThemedText type="title" style={{ fontSize: 40 }}>{score}</ThemedText>
+          {combo >= 2 && (
+            <View style={styles.comboTag}>
+              <ThemedText type="smallBold" color={Brand.ink}>Combo x{combo}</ThemedText>
+            </View>
+          )}
+          <ThemedText type="smallBold" color={low ? Brand.accent : Brand.muted}>{timeLeft}s</ThemedText>
+        </View>
+
+        {/* The problem */}
+        <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.problemCard}>
+          <ThemedText style={styles.problem}>{problem.prompt} = ?</ThemedText>
         </SketchSurface>
 
-        {feedback && (
-          <View style={styles.feedbackRow}>
-            <ThemedText type="smallBold" color={feedback === 'hit' ? Brand.blue : Brand.accent}>
-              {feedback === 'hit' ? 'Bullseye! 🎯' : `Off by ${Math.round(Math.abs((marker ?? 0) - target))}`}
-            </ThemedText>
-            <BigButton label="Next →" variant="primary" onPress={next} />
-          </View>
-        )}
+        {/* Answer bubbles (2x2) */}
+        <View style={styles.grid}>
+          {problem.choices.map((c, i) => {
+            const isFlash = flash?.index === i;
+            const bg = isFlash ? (flash!.ok ? Brand.blue : Brand.accent) : Brand.card;
+            const fg = isFlash ? '#fff' : Brand.ink;
+            return (
+              <Pressable
+                key={`${problem.prompt}-${c}`}
+                onPress={() => answer(i)}
+                style={[styles.bubble, Wobbly.md, offsetShadow(4, Brand.ink), { backgroundColor: bg }]}
+              >
+                <ThemedText style={[styles.bubbleText, { color: fg }]}>{c}</ThemedText>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -149,48 +320,83 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    justifyContent: 'center',
   },
   centered: { flex: 1, justifyContent: 'center', padding: Spacing.four, maxWidth: MaxContentWidth, width: '100%', alignSelf: 'center' },
-  target: { color: Brand.ink, textAlign: 'center', fontSize: 52, lineHeight: 58, marginTop: Spacing.two },
-  pad: { paddingVertical: Spacing.five },
-  line: { height: 64, justifyContent: 'center' },
-  lineBar: {
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Brand.ink,
-    borderTopLeftRadius: 6,
-    borderBottomRightRadius: 6,
-  },
-  endLabel: {
-    position: 'absolute',
-    top: -6,
-    color: Brand.muted,
-    fontSize: 14,
-    fontFamily: 'PatrickHand_400Regular',
-  },
-  marker: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    marginLeft: -10,
-    borderWidth: 2,
-    borderColor: Brand.ink,
-  },
-  trueMark: {
-    position: 'absolute',
-    width: 0,
-    height: 40,
-    marginLeft: -1,
-    borderLeftWidth: 3,
-    borderStyle: 'dashed',
-    borderColor: Brand.blue,
-  },
-  feedbackRow: {
+  bigTitle: { textAlign: 'center', fontSize: 42, lineHeight: 48 },
+  center: { textAlign: 'center', color: Brand.muted },
+  boardRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.three,
+    paddingVertical: 6,
+  },
+  youRow: {
+    backgroundColor: Brand.postit,
+    borderWidth: 2,
+    borderColor: Brand.accent,
+    ...Wobbly.sm,
+    paddingHorizontal: Spacing.two,
+    marginVertical: 2,
+  },
+  rankBadge: {
+    alignSelf: 'center',
+    backgroundColor: Brand.accent,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 6,
+    ...Wobbly.pill,
+    transform: [{ rotate: '-1deg' }],
+  },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, marginTop: Spacing.two },
+  timerTrack: {
+    flex: 1,
+    height: 16,
+    borderRadius: 9,
+    backgroundColor: Brand.card,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    overflow: 'hidden',
+    padding: 2,
+  },
+  timerFill: { height: '100%', borderRadius: 6 },
+  rankPill: {
+    backgroundColor: Brand.ink,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 5,
+    ...Wobbly.pill,
+  },
+  scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  comboTag: {
+    backgroundColor: Brand.postit,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 2,
+    ...Wobbly.sm,
+    transform: [{ rotate: '-3deg' }],
+  },
+  problemCard: { minHeight: 130, justifyContent: 'center' },
+  problem: {
+    fontFamily: HandFonts.heading,
+    color: Brand.ink,
+    textAlign: 'center',
+    fontSize: 44,
+    lineHeight: 52,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     gap: Spacing.three,
   },
+  bubble: {
+    width: '47%',
+    minHeight: 74,
+    borderWidth: 3,
+    borderColor: Brand.ink,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bubbleText: { fontFamily: HandFonts.heading, fontSize: 30 },
 });

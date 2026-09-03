@@ -5,8 +5,9 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
+import { FocusGuard } from '@/components/focus-guard';
 import { MasteryRing } from '@/components/mastery-ring';
-import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
+import { PaperBg, SketchSurface, SpeakerIcon, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly } from '@/constants/theme';
 import { SKILLS, SKILL_BY_ID, generateTask } from '@/lib/curriculum';
@@ -27,7 +28,7 @@ function pickSkillId(mastery: Record<string, number>): string {
 export default function Learn() {
   const router = useRouter();
   const store = useStore();
-  const { mastery, difficulty, streak, recordTurn, resolveOpenEvents } = store;
+  const { studentName, mastery, difficulty, streak, recordTurn, resolveOpenEvents } = store;
 
   const [task, setTask] = useState<Task | null>(null);
   const [answer, setAnswer] = useState('');
@@ -110,14 +111,14 @@ export default function Learn() {
         <View style={styles.centered}>
           <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={{ gap: Spacing.two }}>
             <ThemedText type="title" style={{ color: Brand.blue, textAlign: 'center' }}>
-              Great focus! 🎉
+              Great focus!
             </ThemedText>
             <ThemedText style={{ color: Brand.muted, textAlign: 'center', marginBottom: Spacing.two }}>
-              You finished {TASKS_PER_SESSION} questions with a {streak}🔥 streak.
+              You finished {TASKS_PER_SESSION} questions with a {streak} day streak.
               {unlocked ? ' You unlocked a game!' : ' Keep going to unlock a game.'}
             </ThemedText>
             <BigButton
-              label="Play Number Line Dash 🏁"
+              label="Play Math Sprint"
               variant="primary"
               onPress={() => router.replace('/game')}
             />
@@ -140,6 +141,8 @@ export default function Learn() {
     <SafeAreaView style={styles.safe}>
       <PaperBg />
       <View style={styles.container}>
+        <FocusGuard studentName={studentName} />
+
         {/* Progress + the one skill in focus */}
         <View style={styles.topRow}>
           <View style={styles.progressTrack}>
@@ -159,7 +162,7 @@ export default function Learn() {
         {/* The single task in focus — taped to the page */}
         <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.taskCard}>
           <Pressable onPress={() => speak(task.prompt)} style={styles.speaker} hitSlop={12}>
-            <ThemedText style={{ fontSize: 20 }}>🔊</ThemedText>
+            <SpeakerIcon size={20} />
           </Pressable>
           <ThemedText style={styles.prompt}>{task.prompt}</ThemedText>
         </SketchSurface>
@@ -197,7 +200,7 @@ export default function Learn() {
                   editable={!busy}
                   onSubmitEditing={() => submit()}
                 />
-                <BigButton label={busy ? 'Thinking…' : 'Check it ✓'} variant="primary" disabled={busy} onPress={() => submit()} />
+                <BigButton label={busy ? 'Thinking…' : 'Check it'} variant="primary" disabled={busy} onPress={() => submit()} />
               </>
             )}
             <TextInput
@@ -219,7 +222,7 @@ export default function Learn() {
             style={{ borderColor: result.isCorrect ? Brand.blue : Brand.accent, borderWidth: 3 }}
           >
             <ThemedText type="smallBold" color={result.isCorrect ? Brand.blue : Brand.accent}>
-              {result.isCorrect ? 'Correct! ✓' : result.misconceptionTag ? 'Let’s rethink 🤔' : 'Not yet — keep going'}
+              {result.isCorrect ? 'Correct!' : result.misconceptionTag ? 'Let’s rethink' : 'Not yet — keep going'}
             </ThemedText>
             <ThemedText style={{ marginTop: Spacing.one }}>{result.message}</ThemedText>
             {!result.isCorrect && !!result.hint && (
@@ -238,7 +241,7 @@ export default function Learn() {
                 />
               )}
               <BigButton
-                label={result.isCorrect ? 'Next →' : 'Skip →'}
+                label={result.isCorrect ? 'Next' : 'Skip'}
                 variant="primary"
                 onPress={advance}
                 style={{ flex: 1 }}

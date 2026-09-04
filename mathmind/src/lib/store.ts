@@ -16,6 +16,12 @@ export const MASTERY_THRESHOLD = 0.8; // level at which a skill is "mastered" + 
 
 export type Role = 'student' | 'teacher';
 
+export interface AppSettings {
+  readAloud: boolean; // Milo speaks aloud (TTS)
+  captions: boolean; // show on-screen subtitles of what's spoken
+  reduceMotion: boolean; // calm the animations (buddy bob, game flourishes)
+}
+
 interface AppState {
   role: Role | null;
   studentName: string;
@@ -26,10 +32,12 @@ interface AppState {
   events: MisconceptionEvent[];
   xp: number;
   streak: number;
+  settings: AppSettings;
 
   // actions
   setRole: (role: Role) => void;
   setStudentName: (name: string) => void;
+  setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   recordTurn: (turn: TurnRecord) => void;
   resolveOpenEvents: (skillId: string) => void;
   resetProgress: () => void;
@@ -56,9 +64,12 @@ export const useStore = create<AppState>()(
       events: [],
       xp: 0,
       streak: 0,
+      settings: { readAloud: true, captions: true, reduceMotion: false },
 
       setRole: (role) => set({ role }),
       setStudentName: (studentName) => set({ studentName }),
+      setSetting: (key, value) =>
+        set((state) => ({ settings: { ...state.settings, [key]: value } })),
 
       recordTurn: (turn) =>
         set((state) => {
@@ -174,6 +185,7 @@ export const useStore = create<AppState>()(
         events: s.events,
         xp: s.xp,
         streak: s.streak,
+        settings: s.settings,
       }),
     },
   ),

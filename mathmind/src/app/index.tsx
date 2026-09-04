@@ -129,6 +129,14 @@ export default function Home() {
             }}
           />
         </SketchSurface>
+
+        <BigButton
+          label="Settings"
+          variant="ghost"
+          tint={Brand.ink}
+          onPress={() => router.push('/settings')}
+          style={{ marginTop: Spacing.four }}
+        />
       </ScrollView>
     </SafeAreaView>
   );

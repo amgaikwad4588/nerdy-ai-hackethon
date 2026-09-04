@@ -9,6 +9,7 @@ import Svg, { Circle, Ellipse, G, Line, Path, Polygon } from 'react-native-svg';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, HandFonts, offsetShadow, Spacing, Wobbly } from '@/constants/theme';
 import { onTalking, speak } from '@/lib/speak';
+import { useStore } from '@/lib/store';
 
 export type BuddyMood = 'idle' | 'happy' | 'thinking' | 'cheer' | 'oops';
 
@@ -166,11 +167,16 @@ export function Buddy({
   style?: ViewStyle;
 }) {
   const [talking, setTalking] = useState(false);
+  const reduceMotion = useStore((s) => s.settings.reduceMotion);
   const bob = useRef(new Animated.Value(0)).current;
 
   useEffect(() => onTalking(setTalking), []);
 
   useEffect(() => {
+    if (reduceMotion) {
+      bob.setValue(0);
+      return;
+    }
     const anim = Animated.loop(
       Animated.sequence([
         Animated.timing(bob, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
@@ -179,7 +185,7 @@ export function Buddy({
     );
     anim.start();
     return () => anim.stop();
-  }, [bob]);
+  }, [bob, reduceMotion]);
 
   const translateY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -6] });
 

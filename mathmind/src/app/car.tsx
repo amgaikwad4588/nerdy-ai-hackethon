@@ -233,6 +233,7 @@ export default function CarGame() {
   const studentName = useStore((s) => s.studentName);
   const diff = (useStore((s) => s.difficulty['mult-facts']) ?? 1) as Difficulty;
   const recordTurn = useStore((s) => s.recordTurn);
+  const scoreEligible = useStore((s) => s.scoreEligible);
 
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [phase, setPhase] = useState<'ready' | 'playing' | 'over'>('ready');
@@ -442,13 +443,12 @@ export default function CarGame() {
   };
 
   const standings = useMemo(() => {
-    const all = [
-      { name: `${studentName} (you)`, dist, you: true },
-      ...friends.map((f) => ({ name: f.name, dist: f.dist, you: false })),
-    ];
+    // Only place the player on the scoreboard when the camera was on during study.
+    const rivals = friends.map((f) => ({ name: f.name, dist: f.dist, you: false }));
+    const all = scoreEligible ? [{ name: `${studentName} (you)`, dist, you: true }, ...rivals] : rivals;
     return all.sort((a, b) => b.dist - a.dist);
-  }, [dist, friends, studentName]);
-  const myPos = standings.findIndex((s) => s.you) + 1;
+  }, [dist, friends, studentName, scoreEligible]);
+  const myPos = scoreEligible ? standings.findIndex((s) => s.you) + 1 : 0;
 
   // ---- READY ----------------------------------------------------------------
   if (phase === 'ready') {
@@ -489,11 +489,17 @@ export default function CarGame() {
         <View style={styles.menu}>
           <SketchSurface decoration="tack" rotate={-1} shadow={6} radius="lg" style={{ gap: Spacing.two }}>
             <ThemedText type="smallBold" color={Brand.muted} style={styles.center}>CHEQUERED FLAG</ThemedText>
-            <View style={styles.rankBadge}>
-              <ThemedText type="smallBold" color="#fff" style={{ fontSize: 18 }}>
-                You finished #{myPos} of {standings.length}{medal ? ` — ${medal} place` : ''}
-              </ThemedText>
-            </View>
+            {scoreEligible ? (
+              <View style={styles.rankBadge}>
+                <ThemedText type="smallBold" color="#fff" style={{ fontSize: 18 }}>
+                  You finished #{myPos} of {standings.length}{medal ? ` — ${medal} place` : ''}
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={[styles.rankBadge, { backgroundColor: Brand.ink }]}>
+                <ThemedText type="smallBold" color="#fff">Practice run — camera off, not on the scoreboard</ThemedText>
+              </View>
+            )}
             <View style={{ marginTop: Spacing.two }}>
               {standings.map((s, i) => (
                 <View key={s.name} style={[styles.gridRow, s.you && styles.youRow]}>
@@ -503,9 +509,14 @@ export default function CarGame() {
                 </View>
               ))}
             </View>
+            {!scoreEligible && (
+              <ThemedText type="small" color={Brand.muted} style={styles.center}>
+                Turn on the camera during study (Focus Guard) to race for the scoreboard.
+              </ThemedText>
+            )}
             <MiloCoach
-              summary={`Highway Racer: the child finished #${myPos} of ${standings.length} against classmates on multiplication facts.`}
-              fallback={myPos === 1 ? `Checkered flag — #1! You steered into the right answers all race.` : `You finished #${myPos}. Keep your eyes up the road and you'll take the lead!`}
+              summary={scoreEligible ? `Highway Racer: the child finished #${myPos} of ${standings.length} against classmates on multiplication facts.` : `Highway Racer practice: the child raced classmates on multiplication facts (not on the scoreboard this time).`}
+              fallback={scoreEligible ? (myPos === 1 ? `Checkered flag — #1! You steered into the right answers all race.` : `You finished #${myPos}. Keep your eyes up the road and you'll take the lead!`) : `Great driving! Turn the camera on to race for the scoreboard.`}
               style={{ marginTop: Spacing.two }}
             />
             <BigButton label="Race again" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
@@ -548,7 +559,7 @@ export default function CarGame() {
         {/* HUD */}
         <View style={styles.hud}>
           <View style={[styles.rankPill, { transform: [{ rotate: '-2deg' }] }]}>
-            <ThemedText type="smallBold" color="#fff">Position #{myPos}</ThemedText>
+            <ThemedText type="smallBold" color="#fff">{scoreEligible ? `Position #${myPos}` : 'Practice'}</ThemedText>
           </View>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${(dist / FINISH) * 100}%` }]} />

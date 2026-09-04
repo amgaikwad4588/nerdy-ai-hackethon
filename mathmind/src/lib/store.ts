@@ -33,11 +33,13 @@ interface AppState {
   xp: number;
   streak: number;
   settings: AppSettings;
+  scoreEligible: boolean; // camera-on during study → eligible for the game scoreboard
 
   // actions
   setRole: (role: Role) => void;
   setStudentName: (name: string) => void;
   setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
+  setScoreEligible: (v: boolean) => void;
   recordTurn: (turn: TurnRecord) => void;
   resolveOpenEvents: (skillId: string) => void;
   resetProgress: () => void;
@@ -65,11 +67,13 @@ export const useStore = create<AppState>()(
       xp: 0,
       streak: 0,
       settings: { readAloud: true, captions: true, reduceMotion: false },
+      scoreEligible: false,
 
       setRole: (role) => set({ role }),
       setStudentName: (studentName) => set({ studentName }),
       setSetting: (key, value) =>
         set((state) => ({ settings: { ...state.settings, [key]: value } })),
+      setScoreEligible: (scoreEligible) => set({ scoreEligible }),
 
       recordTurn: (turn) =>
         set((state) => {

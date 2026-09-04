@@ -24,6 +24,7 @@ import { BigButton } from '@/components/big-button';
 import { SketchSurface } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing, Wobbly } from '@/constants/theme';
+import { useStore } from '@/lib/store';
 
 const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model';
 const MATCH_THRESHOLD = 0.55; // lower = stricter identity match
@@ -44,6 +45,7 @@ const STATUS_UI: Record<Status, { color: string; short: string; label: string }>
 };
 
 export function FocusGuard({ studentName }: { studentName: string }) {
+  const setScoreEligible = useStore((s) => s.setScoreEligible);
   const stageRef = useRef<any>(null); // RNW View -> DOM node we append <video> to
   const videoRef = useRef<any>(null);
   const streamRef = useRef<any>(null);
@@ -86,8 +88,9 @@ export function FocusGuard({ studentName }: { studentName: string }) {
     return () => {
       mounted.current = false;
       stopEverything();
+      setScoreEligible(false);
     };
-  }, [stopEverything]);
+  }, [stopEverything, setScoreEligible]);
 
   const opts = () => new faceapiRef.current.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
 
@@ -154,6 +157,7 @@ export function FocusGuard({ studentName }: { studentName: string }) {
       setError(friendlyError(e));
       setPhase('error');
       stopEverything();
+      setScoreEligible(false);
     }
   }
 
@@ -208,6 +212,7 @@ export function FocusGuard({ studentName }: { studentName: string }) {
       if (alignTimer.current) clearInterval(alignTimer.current);
       alignTimer.current = null;
       setPhase('watching');
+      setScoreEligible(true); // camera on during study → you're on the scoreboard
       scheduleCheck(1500); // first spot-check soon after enrolling
     } catch (e) {
       setError(friendlyError(e));
@@ -255,6 +260,7 @@ export function FocusGuard({ studentName }: { studentName: string }) {
     setEnrolledPhoto(null);
     setError('');
     setPhase('off');
+    setScoreEligible(false);
   }
 
   const active = phase === 'align' || phase === 'watching' || phase === 'starting';
@@ -294,7 +300,13 @@ export function FocusGuard({ studentName }: { studentName: string }) {
             Take one photo of {studentName}, then the camera quietly checks a few random
             snapshots while you study. Runs on this device only — nothing is uploaded.
           </ThemedText>
-          <BigButton label="Turn on Focus Guard" variant="ghost" tint={Brand.ink} onPress={enable} />
+          <View style={[styles.optInNote, { borderColor: Brand.blue }]}>
+            <ThemedText type="small" color={Brand.ink}>
+              Turn the camera on and your points count on the class scoreboard. Prefer not
+              to? You can still study and play — you just won&apos;t be ranked.
+            </ThemedText>
+          </View>
+          <BigButton label="Turn on camera + join scoreboard" variant="primary" onPress={enable} />
         </>
       )}
 
@@ -403,6 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: 140,
   },
   center: { textAlign: 'center' },
+  optInNote: { borderWidth: 2, backgroundColor: Brand.postit, padding: Spacing.two, ...Wobbly.sm },
   btnRow: { flexDirection: 'row', gap: Spacing.two },
   thumbRow: { flexDirection: 'row', gap: Spacing.three, justifyContent: 'center' },
   thumbBox: { alignItems: 'center', gap: 4 },

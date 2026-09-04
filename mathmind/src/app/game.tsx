@@ -75,6 +75,7 @@ export default function Game() {
   const studentName = useStore((s) => s.studentName);
   const diff = (useStore((s) => s.difficulty['mult-facts']) ?? 1) as Difficulty;
   const recordTurn = useStore((s) => s.recordTurn);
+  const scoreEligible = useStore((s) => s.scoreEligible);
 
   const [phase, setPhase] = useState<'ready' | 'playing' | 'over'>('ready');
   const [problem, setProblem] = useState<Problem>(() => makeProblem(diff));
@@ -225,11 +226,12 @@ export default function Game() {
 
   // ---- OVER -----------------------------------------------------------------
   if (phase === 'over') {
-    const board = [
-      ...CLASSMATES.map((c, i) => ({ name: c.name, score: rivalScores[i], you: false })),
-      { name: `${studentName} (you)`, score, you: true },
-    ].sort((a, b) => b.score - a.score);
-    const myRank = board.findIndex((r) => r.you) + 1;
+    // Only rank the player on the scoreboard when the camera was on during study.
+    const rivalsBoard = CLASSMATES.map((c, i) => ({ name: c.name, score: rivalScores[i], you: false }));
+    const board = (scoreEligible ? [...rivalsBoard, { name: `${studentName} (you)`, score, you: true }] : rivalsBoard).sort(
+      (a, b) => b.score - a.score,
+    );
+    const myRank = scoreEligible ? board.findIndex((r) => r.you) + 1 : 0;
     const medal = myRank === 1 ? 'first' : myRank === 2 ? 'second' : myRank === 3 ? 'third' : '';
     return (
       <SafeAreaView style={styles.safe}>
@@ -242,12 +244,20 @@ export default function Game() {
             <ThemedText type="title" style={[styles.bigTitle, { color: Brand.blue }]}>
               {score} pts
             </ThemedText>
-            <View style={styles.rankBadge}>
-              <ThemedText type="smallBold" color="#fff" style={{ fontSize: 18 }}>
-                You ranked #{myRank} of {board.length}
-                {medal ? ` — ${medal} place` : ''}
-              </ThemedText>
-            </View>
+            {scoreEligible ? (
+              <View style={styles.rankBadge}>
+                <ThemedText type="smallBold" color="#fff" style={{ fontSize: 18 }}>
+                  You ranked #{myRank} of {board.length}
+                  {medal ? ` — ${medal} place` : ''}
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={[styles.rankBadge, { backgroundColor: Brand.ink }]}>
+                <ThemedText type="smallBold" color="#fff">
+                  Practice run — camera off, not on the scoreboard
+                </ThemedText>
+              </View>
+            )}
 
             <View style={{ marginTop: Spacing.two }}>
               {board.map((r, i) => (
@@ -265,9 +275,16 @@ export default function Game() {
               ))}
             </View>
 
+            {!scoreEligible && (
+              <ThemedText type="small" color={Brand.muted} style={styles.center}>
+                Turn on the camera during study (Focus Guard) to put your {score} points on
+                the board.
+              </ThemedText>
+            )}
+
             <MiloCoach
-              summary={`Math Sprint: the child scored ${score} points and ranked #${myRank} of ${board.length}.`}
-              fallback={myRank === 1 ? `First place with ${score} points — your fast facts are on fire!` : `You scored ${score} and came #${myRank}. Race again and climb the board!`}
+              summary={scoreEligible ? `Math Sprint: the child scored ${score} points and ranked #${myRank} of ${board.length}.` : `Math Sprint practice: the child scored ${score} points (not on the scoreboard this time).`}
+              fallback={scoreEligible ? (myRank === 1 ? `First place with ${score} points — your fast facts are on fire!` : `You scored ${score} and came #${myRank}. Race again and climb the board!`) : `Nice ${score} points! Turn the camera on to race for the scoreboard.`}
               style={{ marginTop: Spacing.two }}
             />
             <BigButton label="Race again" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
@@ -11,19 +11,21 @@ import { useStore } from '@/lib/store';
 import type { Difficulty } from '@/lib/types';
 
 // Math Sprint: a fast, competitive arithmetic race. Answer as many as you can before
-// the timer runs out; a combo multiplier rewards streaks. You race a class leaderboard
-// live, and see your rank at the end. Every correct answer feeds a mastery signal.
+// the timer runs out; a combo multiplier rewards streaks. The class races you *live* —
+// their scores climb during the round so your rank keeps swinging. Every correct answer
+// feeds a mastery signal.
 
 const SPRINT_SECONDS = 30;
 const ROUND_MS = { hit: 160, miss: 420 };
 
-// The rest of the class you're racing. Their scores get a little jitter each round.
+// The rest of the class you're racing. `pace` is roughly how many points they finish
+// with; we spread that across the round so they climb live at their own speed.
 const CLASSMATES = [
-  { name: 'Maya', base: 280 },
-  { name: 'Zara', base: 240 },
-  { name: 'Leo', base: 200 },
-  { name: 'Ada', base: 170 },
-  { name: 'Kai', base: 140 },
+  { name: 'Maya', pace: 310 },
+  { name: 'Zara', pace: 265 },
+  { name: 'Leo', pace: 220 },
+  { name: 'Ada', pace: 180 },
+  { name: 'Kai', pace: 150 },
 ];
 
 interface Problem {
@@ -80,24 +82,40 @@ export default function Game() {
   const [best, setBest] = useState(0);
   const [timeLeft, setTimeLeft] = useState(SPRINT_SECONDS);
   const [flash, setFlash] = useState<{ index: number; ok: boolean } | null>(null);
-  const locked = useRef(false);
+  const [rivalScores, setRivalScores] = useState<number[]>(() => CLASSMATES.map(() => 0));
 
-  // Fixed classmate scores for this round.
-  const rivals = useMemo(
-    () => CLASSMATES.map((c) => ({ name: c.name, score: Math.max(0, c.base + rnd(61) - 30) })),
-    [phase === 'ready'], // re-roll each time we return to the ready screen
+  const locked = useRef(false);
+  const scoreRef = useRef(0);
+  const ratesRef = useRef<number[]>([]); // points-per-second for each rival, this round
+
+  // Keep a ref of the live score so the 1s tick doesn't need to restart on every answer.
+  useEffect(() => {
+    scoreRef.current = score;
+  }, [score]);
+
+  const rank = 1 + rivalScores.filter((s) => s > score).length;
+
+  // Floating "+N" that pops on a correct answer.
+  const gain = useRef(new Animated.Value(0)).current;
+  const [gainAmt, setGainAmt] = useState(0);
+  const popGain = useCallback(
+    (amt: number) => {
+      setGainAmt(amt);
+      gain.setValue(1);
+      Animated.timing(gain, { toValue: 0, duration: 650, useNativeDriver: true }).start();
+    },
+    [gain],
   );
 
-  const rank = 1 + rivals.filter((r) => r.score > score).length;
-
-  // Countdown.
+  // Countdown + live rival climb. Runs once per round (deps: phase only).
   useEffect(() => {
     if (phase !== 'playing') return;
     const id = setInterval(() => {
+      setRivalScores((prev) => prev.map((s, i) => s + ratesRef.current[i] + rnd(4)));
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(id);
-          setBest((b) => Math.max(b, score));
+          setBest((b) => Math.max(b, scoreRef.current));
           setPhase('over');
           return 0;
         }
@@ -105,7 +123,7 @@ export default function Game() {
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [phase, score]);
+  }, [phase]);
 
   const start = useCallback(() => {
     setScore(0);
@@ -113,6 +131,10 @@ export default function Game() {
     setTimeLeft(SPRINT_SECONDS);
     setProblem(makeProblem(diff));
     setFlash(null);
+    // Each rival gets a per-second rate (their pace spread over the round, jittered) and
+    // a small head start, so the leaderboard is alive from the first second.
+    ratesRef.current = CLASSMATES.map((c) => (c.pace / SPRINT_SECONDS) * (0.85 + Math.random() * 0.3));
+    setRivalScores(CLASSMATES.map(() => rnd(14)));
     locked.current = false;
     setPhase('playing');
   }, [diff]);
@@ -125,8 +147,10 @@ export default function Game() {
     setFlash({ index, ok });
 
     if (ok) {
-      setScore((s) => s + 10 + combo * 2); // streaks pay off
+      const pts = 10 + combo * 2; // streaks pay off
+      setScore((s) => s + pts);
       setCombo((c) => c + 1);
+      popGain(pts);
       recordTurn({
         id: `sprint-${Date.now()}`,
         at: Date.now(),
@@ -147,16 +171,19 @@ export default function Game() {
       setCombo(0);
     }
 
-    setTimeout(() => {
-      setFlash(null);
-      setProblem(makeProblem(diff));
-      locked.current = false;
-    }, ok ? ROUND_MS.hit : ROUND_MS.miss);
+    setTimeout(
+      () => {
+        setFlash(null);
+        setProblem(makeProblem(diff));
+        locked.current = false;
+      },
+      ok ? ROUND_MS.hit : ROUND_MS.miss,
+    );
   }
 
   // ---- READY ----------------------------------------------------------------
   if (phase === 'ready') {
-    const board = [...rivals].sort((a, b) => b.score - a.score);
+    const preview = [...CLASSMATES].sort((a, b) => b.pace - a.pace);
     return (
       <SafeAreaView style={styles.safe}>
         <PaperBg />
@@ -166,18 +193,19 @@ export default function Game() {
             Beat the class!
           </ThemedText>
           <ThemedText type="small" style={styles.center}>
-            Answer as many as you can in {SPRINT_SECONDS} seconds. Streaks score extra.
+            Answer as many as you can in {SPRINT_SECONDS} seconds. Streaks score extra, and
+            the class is racing you live.
           </ThemedText>
 
           <SketchSurface radius="md" shadow={5} rotate={-0.5} style={{ marginTop: Spacing.two }}>
             <ThemedText type="smallBold" style={{ marginBottom: Spacing.two }}>
-              TODAY&apos;S CLASS SCORES
+              WHO YOU&apos;RE RACING
             </ThemedText>
-            {board.map((r, i) => (
+            {preview.map((r, i) => (
               <View key={r.name} style={styles.boardRow}>
                 <ThemedText type="smallBold" color={Brand.muted}>#{i + 1}</ThemedText>
                 <ThemedText style={{ flex: 1 }}>{r.name}</ThemedText>
-                <ThemedText type="smallBold">{r.score}</ThemedText>
+                <ThemedText type="smallBold" color={Brand.muted}>~{r.pace}</ThemedText>
               </View>
             ))}
           </SketchSurface>
@@ -196,10 +224,11 @@ export default function Game() {
 
   // ---- OVER -----------------------------------------------------------------
   if (phase === 'over') {
-    const board = [...rivals, { name: `${studentName} (you)`, score, you: true }].sort(
-      (a, b) => b.score - a.score,
-    );
-    const myRank = board.findIndex((r) => (r as { you?: boolean }).you) + 1;
+    const board = [
+      ...CLASSMATES.map((c, i) => ({ name: c.name, score: rivalScores[i], you: false })),
+      { name: `${studentName} (you)`, score, you: true },
+    ].sort((a, b) => b.score - a.score);
+    const myRank = board.findIndex((r) => r.you) + 1;
     const medal = myRank === 1 ? 'first' : myRank === 2 ? 'second' : myRank === 3 ? 'third' : '';
     return (
       <SafeAreaView style={styles.safe}>
@@ -220,28 +249,19 @@ export default function Game() {
             </View>
 
             <View style={{ marginTop: Spacing.two }}>
-              {board.map((r, i) => {
-                const you = (r as { you?: boolean }).you;
-                return (
-                  <View
-                    key={r.name}
-                    style={[
-                      styles.boardRow,
-                      you && styles.youRow,
-                    ]}
-                  >
-                    <ThemedText type="smallBold" color={you ? Brand.accent : Brand.muted}>
-                      #{i + 1}
-                    </ThemedText>
-                    <ThemedText style={{ flex: 1 }} color={you ? Brand.accent : Brand.ink}>
-                      {r.name}
-                    </ThemedText>
-                    <ThemedText type="smallBold" color={you ? Brand.accent : Brand.ink}>
-                      {r.score}
-                    </ThemedText>
-                  </View>
-                );
-              })}
+              {board.map((r, i) => (
+                <View key={r.name} style={[styles.boardRow, r.you && styles.youRow]}>
+                  <ThemedText type="smallBold" color={r.you ? Brand.accent : Brand.muted}>
+                    #{i + 1}
+                  </ThemedText>
+                  <ThemedText style={{ flex: 1 }} color={r.you ? Brand.accent : Brand.ink}>
+                    {r.name}
+                  </ThemedText>
+                  <ThemedText type="smallBold" color={r.you ? Brand.accent : Brand.ink}>
+                    {r.score}
+                  </ThemedText>
+                </View>
+              ))}
             </View>
 
             <BigButton label="Race again" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
@@ -275,7 +295,18 @@ export default function Game() {
         </View>
 
         <View style={styles.scoreRow}>
-          <ThemedText type="title" style={{ fontSize: 40 }}>{score}</ThemedText>
+          <View style={styles.scoreWrap}>
+            <ThemedText type="title" style={{ fontSize: 40 }}>{score}</ThemedText>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.gainPop,
+                { opacity: gain, transform: [{ translateY: gain.interpolate({ inputRange: [0, 1], outputRange: [-6, -22] }) }] },
+              ]}
+            >
+              <ThemedText type="smallBold" color={Brand.blue}>+{gainAmt}</ThemedText>
+            </Animated.View>
+          </View>
           {combo >= 2 && (
             <View style={styles.comboTag}>
               <ThemedText type="smallBold" color={Brand.ink}>Combo x{combo}</ThemedText>
@@ -367,6 +398,8 @@ const styles = StyleSheet.create({
     ...Wobbly.pill,
   },
   scoreRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  scoreWrap: { position: 'relative' },
+  gainPop: { position: 'absolute', top: 0, right: -28 },
   comboTag: {
     backgroundColor: Brand.postit,
     borderWidth: 2,

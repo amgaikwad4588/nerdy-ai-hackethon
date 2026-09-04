@@ -8,6 +8,14 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### DEMO: all games shortened (RESTORE before production)
+Games trimmed to ~3–4 quick rounds so the demo video stays tight. **Revert these for a
+real build:**
+- Math Sprint `SPRINT_SECONDS` 30 → **18** (`src/app/game.tsx`)
+- Highway Racer `MAX_ROUNDS` 12 → **4**, `FINISH` 120 → **70** (`src/app/car.tsx`)
+- Bird Shooter `ROUND_SECONDS` 45 → **20** (`src/app/birds.tsx`)
+Each is tagged with a `// demo: shortened (was …)` comment.
+
 ### Racer — friends solve their OWN questions (not the player's)
 - **Decision:** In Highway Racer, each friend bot advances based on *their own* problem,
   not the player's. On each round resolve, a friend gains distance with probability =

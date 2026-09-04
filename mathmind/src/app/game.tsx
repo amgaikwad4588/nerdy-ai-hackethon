@@ -15,7 +15,7 @@ import type { Difficulty } from '@/lib/types';
 // their scores climb during the round so your rank keeps swinging. Every correct answer
 // feeds a mastery signal.
 
-const SPRINT_SECONDS = 30;
+const SPRINT_SECONDS = 18; // demo: shortened (was 30)
 const ROUND_MS = { hit: 160, miss: 420 };
 
 // The rest of the class you're racing. `pace` is roughly how many points they finish

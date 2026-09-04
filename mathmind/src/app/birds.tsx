@@ -17,7 +17,7 @@ import type { Difficulty } from '@/lib/types';
 // and fires. Right bird = score + combo and a fresh flock; wrong = the shot misses and
 // your streak breaks. Correct hits feed a mastery signal. 45-second round.
 
-const ROUND_SECONDS = 45;
+const ROUND_SECONDS = 20; // demo: shortened (was 45)
 const TICK_MS = 33;
 const rnd = (n: number) => Math.floor(Math.random() * n);
 

@@ -19,8 +19,8 @@ import type { Difficulty } from '@/lib/types';
 // the road; first to the finish wins. Correct answers feed a mastery signal.
 
 const LANES = 4;
-const FINISH = 120;
-const MAX_ROUNDS = 12;
+const FINISH = 70; // demo: shortened (was 120)
+const MAX_ROUNDS = 4; // demo: shortened (was 12)
 const BOOST = 16;
 const SLOW = 5;
 

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
 
 import { BigButton } from '@/components/big-button';
+import { MiloCoach } from '@/components/milo-coach';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly, offsetShadow } from '@/constants/theme';
@@ -502,6 +503,11 @@ export default function CarGame() {
                 </View>
               ))}
             </View>
+            <MiloCoach
+              summary={`Highway Racer: the child finished #${myPos} of ${standings.length} against classmates on multiplication facts.`}
+              fallback={myPos === 1 ? `Checkered flag — #1! You steered into the right answers all race.` : `You finished #${myPos}. Keep your eyes up the road and you'll take the lead!`}
+              style={{ marginTop: Spacing.two }}
+            />
             <BigButton label="Race again" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
             <BigButton label="Back home" variant="ghost" tint={Brand.ink} onPress={() => router.replace('/')} />
           </SketchSurface>

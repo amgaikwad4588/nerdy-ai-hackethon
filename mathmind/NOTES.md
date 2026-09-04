@@ -8,6 +8,26 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### Live tutor via Gemini (free key) + Milo game coaching
+- **Decision:** Added a **Google Gemini** live-tutor brain (free tier) as the preferred
+  live path, since a free key is cheaper than Claude for the hackathon. Dispatch order in
+  `src/lib/tutor/index.ts`: **Gemini → Supabase/Claude Edge Function → local mock**. Any
+  live error falls back to mock, so a session never breaks.
+- **Setup:** put a free key in `.env` as `EXPO_PUBLIC_GEMINI_API_KEY` (get it at
+  aistudio.google.com/app/apikey). Optional `EXPO_PUBLIC_GEMINI_MODEL` (default
+  `gemini-2.0-flash`). With no key set, home still runs the offline mock.
+- **How:** `src/lib/tutor/gemini.ts` calls the Generative Language REST API with
+  `responseMimeType:'application/json'` + a `responseSchema` matching `TutorResult`. We
+  **grade correctness locally** (we know the answer) and let the model supply only the
+  *coaching* — keeps app logic deterministic.
+- **Milo game coaching:** `geminiCoachLine(summary)` → one personalized sentence; shown via
+  `MiloCoach` on all three game-over screens (instant local fallback line, upgraded by
+  Gemini when configured). Attacks the weakest judging criterion (visible AI).
+- **Caveats / TODO:** client-side key is fine for a demo but insecure for production (move
+  behind an edge function later). Browser **CORS** to the Gemini endpoint is unverified —
+  if it blocks on web, either run the tutor on native or proxy via the edge function; the
+  mock fallback covers it meanwhile. Not yet tested with a real key.
+
 ### DEMO: all games shortened (RESTORE before production)
 Games trimmed to ~3–4 quick rounds so the demo video stays tight. **Revert these for a
 real build:**

@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Rect } from 'react-native-svg';
 
 import { BigButton } from '@/components/big-button';
+import { MiloCoach } from '@/components/milo-coach';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly, offsetShadow } from '@/constants/theme';
@@ -312,6 +313,11 @@ export default function BirdGame() {
             <ThemedText type="small" style={styles.center}>
               {hits} hits · {acc}% accuracy{best > 0 ? ` · best ${Math.max(best, score)}` : ''}
             </ThemedText>
+            <MiloCoach
+              summary={`Bird Shooter: the child scored ${score} points with ${hits} correct hits and ${acc}% accuracy on multiplication facts.`}
+              fallback={acc >= 70 ? `Sharp shooting — ${acc}% on target! Your times tables are getting quick.` : `You bagged ${hits}. Take a breath, read the answer, then shoot — you've got this!`}
+              style={{ marginTop: Spacing.two }}
+            />
             <BigButton label="Play again" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
             <BigButton label="Back home" variant="ghost" tint={Brand.ink} onPress={() => router.replace('/')} />
           </SketchSurface>

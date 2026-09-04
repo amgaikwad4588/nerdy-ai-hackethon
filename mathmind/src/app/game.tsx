@@ -4,6 +4,7 @@ import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
+import { MiloCoach } from '@/components/milo-coach';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly, offsetShadow } from '@/constants/theme';
@@ -264,6 +265,11 @@ export default function Game() {
               ))}
             </View>
 
+            <MiloCoach
+              summary={`Math Sprint: the child scored ${score} points and ranked #${myRank} of ${board.length}.`}
+              fallback={myRank === 1 ? `First place with ${score} points — your fast facts are on fire!` : `You scored ${score} and came #${myRank}. Race again and climb the board!`}
+              style={{ marginTop: Spacing.two }}
+            />
             <BigButton label="Race again" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
             <BigButton label="Back home" variant="ghost" tint={Brand.ink} onPress={() => router.replace('/')} />
           </SketchSurface>

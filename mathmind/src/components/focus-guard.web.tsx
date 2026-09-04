@@ -44,7 +44,7 @@ const STATUS_UI: Record<Status, { color: string; short: string; label: string }>
   multiple: { color: Brand.accent, short: 'Check in', label: 'Looks like more than one person is here.' },
 };
 
-export function FocusGuard({ studentName }: { studentName: string }) {
+export function FocusGuard({ studentName, compact = false }: { studentName: string; compact?: boolean }) {
   const setScoreEligible = useStore((s) => s.setScoreEligible);
   const stageRef = useRef<any>(null); // RNW View -> DOM node we append <video> to
   const videoRef = useRef<any>(null);
@@ -279,7 +279,7 @@ export function FocusGuard({ studentName }: { studentName: string }) {
 
       {/* Live camera stage with alignment oval (video appended imperatively) */}
       {active && (
-        <View style={styles.stage}>
+        <View style={[styles.stage, compact && styles.stageCompact]}>
           <View ref={stageRef} style={StyleSheet.absoluteFill} />
           {phase === 'align' && (
             <View pointerEvents="none" style={styles.guideWrap}>
@@ -344,15 +344,15 @@ export function FocusGuard({ studentName }: { studentName: string }) {
           <View style={styles.thumbRow}>
             {enrolledPhoto && (
               <View style={styles.thumbBox}>
-                <Image source={{ uri: enrolledPhoto }} style={[styles.thumb, { borderColor: Brand.ink }]} />
+                <Image source={{ uri: enrolledPhoto }} style={[styles.thumb, compact && styles.thumbCompact, { borderColor: Brand.ink }]} />
                 <ThemedText type="small" color={Brand.muted}>Enrolled</ThemedText>
               </View>
             )}
             <View style={styles.thumbBox}>
               {lastShot ? (
-                <Image source={{ uri: lastShot.uri }} style={[styles.thumb, { borderColor: s.color }]} />
+                <Image source={{ uri: lastShot.uri }} style={[styles.thumb, compact && styles.thumbCompact, { borderColor: s.color }]} />
               ) : (
-                <View style={[styles.thumb, styles.thumbEmpty]}>
+                <View style={[styles.thumb, compact && styles.thumbCompact, styles.thumbEmpty]}>
                   <ThemedText type="small" color={Brand.muted}>…</ThemedText>
                 </View>
               )}
@@ -398,6 +398,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Wobbly.md,
   },
+  stageCompact: { height: 132 },
   guideWrap: {
     position: 'absolute',
     top: 0,
@@ -420,6 +421,7 @@ const styles = StyleSheet.create({
   thumbRow: { flexDirection: 'row', gap: Spacing.three, justifyContent: 'center' },
   thumbBox: { alignItems: 'center', gap: 4 },
   thumb: { width: 96, height: 72, borderWidth: 3, ...Wobbly.sm },
+  thumbCompact: { width: 66, height: 50, borderWidth: 2 },
   thumbEmpty: { alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.erased, borderColor: Brand.ink },
   banner: { borderWidth: 3, padding: Spacing.three, ...Wobbly.md },
 });

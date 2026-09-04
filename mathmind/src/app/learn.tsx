@@ -161,7 +161,9 @@ export default function Learn() {
     <SafeAreaView style={styles.safe}>
       <PaperBg />
       <View style={styles.container}>
-        <FocusGuard studentName={studentName} />
+        <View style={styles.focusSlot}>
+          <FocusGuard studentName={studentName} compact />
+        </View>
 
         {/* Progress, then a tidy row: skill on the left, mastery on the right */}
         <View style={styles.header}>
@@ -287,6 +289,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   centered: { flex: 1, justifyContent: 'center', padding: Spacing.four, maxWidth: MaxContentWidth, width: '100%', alignSelf: 'center' },
+  focusSlot: { width: 264, maxWidth: '100%', alignSelf: 'flex-end' },
   header: { gap: Spacing.two },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   progressTrack: {

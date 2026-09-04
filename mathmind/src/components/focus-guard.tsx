@@ -7,7 +7,7 @@ import { SketchSurface } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, Spacing } from '@/constants/theme';
 
-export function FocusGuard({ studentName }: { studentName: string }) {
+export function FocusGuard({ studentName }: { studentName: string; compact?: boolean }) {
   return (
     <SketchSurface radius="md" shadow={3} rotate={-0.5} style={{ gap: Spacing.one }}>
       <ThemedText type="smallBold">FOCUS GUARD</ThemedText>

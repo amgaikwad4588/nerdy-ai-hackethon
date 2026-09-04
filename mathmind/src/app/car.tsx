@@ -25,15 +25,18 @@ const BOOST = 16;
 const SLOW = 5;
 
 const FAR = 6; // gate/scenery spawn depth
+const GATE_SPEED = 0.9; // steady approach for the answer gate (decoupled from road speed → more decision time)
 const EVAL_DIST = 0.28; // gate reaches the car
 const REVEAL_DIST = 3.2; // friends show their lane choice
 const BIOME_SECS = 9;
 const TICK_MS = 33;
 
-const BIOMES = [
-  { name: 'grass', ground: '#8fc07a', hill: '#79ad64', tree: 'pine' as const },
-  { name: 'desert', ground: '#e7cf9c', hill: '#d8bd82', tree: 'cactus' as const },
-  { name: 'forest', ground: '#6fae63', hill: '#5c9a52', tree: 'round' as const },
+type TreeKind = 'pine' | 'round' | 'bush' | 'jungle' | 'palm' | 'cactus' | 'rock';
+
+const BIOMES: { name: string; ground: string; hill: string; treeline: boolean; kinds: TreeKind[] }[] = [
+  { name: 'grass', ground: '#8fc07a', hill: '#79ad64', treeline: true, kinds: ['round', 'pine', 'bush', 'round', 'bush'] },
+  { name: 'desert', ground: '#e7cf9c', hill: '#d8bd82', treeline: false, kinds: ['cactus', 'rock', 'cactus', 'bush'] },
+  { name: 'jungle', ground: '#4f9a4a', hill: '#3f7f3c', treeline: true, kinds: ['jungle', 'palm', 'jungle', 'round', 'bush'] },
 ];
 
 const FRIENDS_POOL = [
@@ -90,7 +93,8 @@ interface Scenery {
   side: -1 | 1;
   spread: number;
   dist: number;
-  tree: 'pine' | 'cactus' | 'round';
+  scale: number;
+  tree: TreeKind;
 }
 
 /** Rear-view car (drawn from behind), base sits at (0,0). */
@@ -109,35 +113,79 @@ function RearCar({ x, y, scale, color, ghost = false }: { x: number; y: number; 
   );
 }
 
-/** Roadside tree/cactus, base at (0,0). */
-function Tree({ x, y, scale, kind }: { x: number; y: number; scale: number; kind: 'pine' | 'cactus' | 'round' }) {
+const GREEN_DARK = '#2f6d38';
+const GREEN_MID = '#3f8c46';
+const GREEN_LT = '#57a651';
+const TRUNK = '#7a5236';
+
+/** Roadside plant, base at (0,0). Several kinds so the roadside reads as a real forest. */
+function Tree({ x, y, scale, kind }: { x: number; y: number; scale: number; kind: TreeKind }) {
   const ink = Brand.ink;
-  if (kind === 'cactus') {
-    return (
-      <G transform={`translate(${x}, ${y}) scale(${scale})`}>
-        <Path d="M-4 0 L-4 -34 Q-4 -40 4 -40 L4 0 Z" fill="#4c8b52" stroke={ink} strokeWidth={2} />
-        <Path d="M-4 -20 Q-16 -20 -16 -30 L-16 -22" fill="none" stroke="#4c8b52" strokeWidth={7} strokeLinecap="round" />
-        <Path d="M4 -26 Q16 -26 16 -36 L16 -28" fill="none" stroke="#4c8b52" strokeWidth={7} strokeLinecap="round" />
-      </G>
-    );
+  const t = `translate(${x}, ${y}) scale(${scale})`;
+  switch (kind) {
+    case 'cactus':
+      return (
+        <G transform={t}>
+          <Path d="M-4 0 L-4 -34 Q-4 -40 4 -40 L4 0 Z" fill="#4c8b52" stroke={ink} strokeWidth={2} />
+          <Path d="M-4 -20 Q-16 -20 -16 -30 L-16 -22" fill="none" stroke="#4c8b52" strokeWidth={7} strokeLinecap="round" />
+          <Path d="M4 -26 Q16 -26 16 -36 L16 -28" fill="none" stroke="#4c8b52" strokeWidth={7} strokeLinecap="round" />
+        </G>
+      );
+    case 'rock':
+      return (
+        <G transform={t}>
+          <Path d="M-16 0 Q-20 -14 -8 -18 Q0 -24 10 -18 Q20 -14 16 0 Z" fill="#b3a892" stroke={ink} strokeWidth={2} strokeLinejoin="round" />
+          <Path d="M-4 -6 Q0 -14 8 -12" fill="none" stroke="#8f8574" strokeWidth={2} />
+        </G>
+      );
+    case 'bush':
+      return (
+        <G transform={t}>
+          <Circle cx={-9} cy={-7} r={10} fill={GREEN_MID} stroke={ink} strokeWidth={2} />
+          <Circle cx={9} cy={-7} r={10} fill={GREEN_MID} stroke={ink} strokeWidth={2} />
+          <Circle cx={0} cy={-14} r={12} fill={GREEN_LT} stroke={ink} strokeWidth={2} />
+        </G>
+      );
+    case 'round':
+      return (
+        <G transform={t}>
+          <Rect x={-3} y={-16} width={6} height={18} fill={TRUNK} stroke={ink} strokeWidth={1.5} />
+          <Circle cx={0} cy={-28} r={17} fill={GREEN_MID} stroke={ink} strokeWidth={2} />
+          <Circle cx={-10} cy={-19} r={11} fill={GREEN_LT} stroke={ink} strokeWidth={2} />
+          <Circle cx={10} cy={-19} r={11} fill={GREEN_LT} stroke={ink} strokeWidth={2} />
+        </G>
+      );
+    case 'palm':
+      return (
+        <G transform={t}>
+          <Path d="M-3 0 Q2 -26 -3 -52" fill="none" stroke={TRUNK} strokeWidth={7} strokeLinecap="round" />
+          <Path d="M-3 -52 Q-22 -58 -34 -48" fill="none" stroke={GREEN_DARK} strokeWidth={6} strokeLinecap="round" />
+          <Path d="M-3 -52 Q16 -60 30 -52" fill="none" stroke={GREEN_MID} strokeWidth={6} strokeLinecap="round" />
+          <Path d="M-3 -52 Q-16 -70 -22 -80" fill="none" stroke={GREEN_MID} strokeWidth={6} strokeLinecap="round" />
+          <Path d="M-3 -52 Q14 -72 22 -80" fill="none" stroke={GREEN_DARK} strokeWidth={6} strokeLinecap="round" />
+          <Path d="M-3 -52 Q0 -72 0 -84" fill="none" stroke={GREEN_LT} strokeWidth={6} strokeLinecap="round" />
+        </G>
+      );
+    case 'jungle':
+      return (
+        <G transform={t}>
+          <Rect x={-4} y={-34} width={9} height={36} fill={TRUNK} stroke={ink} strokeWidth={2} />
+          <Circle cx={0} cy={-52} r={22} fill={GREEN_DARK} stroke={ink} strokeWidth={2} />
+          <Circle cx={-16} cy={-40} r={15} fill={GREEN_MID} stroke={ink} strokeWidth={2} />
+          <Circle cx={16} cy={-40} r={15} fill={GREEN_MID} stroke={ink} strokeWidth={2} />
+          <Circle cx={0} cy={-38} r={16} fill={GREEN_LT} stroke={ink} strokeWidth={2} />
+        </G>
+      );
+    default: // pine
+      return (
+        <G transform={t}>
+          <Rect x={-3} y={-12} width={6} height={14} fill={TRUNK} stroke={ink} strokeWidth={1.5} />
+          <Polygon points="0,-54 14,-32 -14,-32" fill={GREEN_MID} stroke={ink} strokeWidth={2} strokeLinejoin="round" />
+          <Polygon points="0,-42 13,-22 -13,-22" fill={GREEN_LT} stroke={ink} strokeWidth={2} strokeLinejoin="round" />
+          <Polygon points="0,-30 12,-10 -12,-10" fill={GREEN_MID} stroke={ink} strokeWidth={2} strokeLinejoin="round" />
+        </G>
+      );
   }
-  if (kind === 'round') {
-    return (
-      <G transform={`translate(${x}, ${y}) scale(${scale})`}>
-        <Rect x={-3} y={-16} width={6} height={18} fill="#7a5236" stroke={ink} strokeWidth={1.5} />
-        <Circle cx={0} cy={-26} r={16} fill="#4f9a4a" stroke={ink} strokeWidth={2} />
-        <Circle cx={-9} cy={-18} r={10} fill="#57a651" stroke={ink} strokeWidth={2} />
-        <Circle cx={9} cy={-18} r={10} fill="#57a651" stroke={ink} strokeWidth={2} />
-      </G>
-    );
-  }
-  return (
-    <G transform={`translate(${x}, ${y}) scale(${scale})`}>
-      <Rect x={-3} y={-12} width={6} height={14} fill="#7a5236" stroke={ink} strokeWidth={1.5} />
-      <Polygon points="0,-46 14,-20 -14,-20" fill="#3f8c46" stroke={ink} strokeWidth={2} strokeLinejoin="round" />
-      <Polygon points="0,-34 12,-10 -12,-10" fill="#4a9c51" stroke={ink} strokeWidth={2} strokeLinejoin="round" />
-    </G>
-  );
 }
 
 export default function CarGame() {
@@ -246,15 +294,21 @@ export default function CarGame() {
     paused.current = false;
   }, []);
 
-  const seedScenery = useCallback(() => {
-    const b = BIOMES[biomeRef.current].tree;
-    scenery.current = Array.from({ length: 12 }).map((_, i) => ({
-      side: i % 2 === 0 ? -1 : (1 as -1 | 1),
-      spread: 1.15 + Math.random() * 0.7,
-      dist: 0.4 + (i / 12) * FAR + Math.random() * 0.4,
-      tree: b,
-    }));
+  const pickKind = useCallback((): TreeKind => {
+    const k = BIOMES[biomeRef.current].kinds;
+    return k[rnd(k.length)];
   }, []);
+
+  const COUNT = 26;
+  const seedScenery = useCallback(() => {
+    scenery.current = Array.from({ length: COUNT }).map((_, i) => ({
+      side: i % 2 === 0 ? -1 : (1 as -1 | 1),
+      spread: 1.1 + Math.random() * 1.6, // some hug the road, some sit deep in the trees
+      dist: 0.4 + (i / COUNT) * FAR + Math.random() * 0.4,
+      scale: 0.8 + Math.random() * 0.7,
+      tree: pickKind(),
+    }));
+  }, [pickKind]);
 
   // ---- game loop ------------------------------------------------------------
   useEffect(() => {
@@ -274,8 +328,9 @@ export default function CarGame() {
         if (s.dist < 0.25) {
           s.dist += FAR + Math.random() * 1.5;
           s.side = Math.random() < 0.5 ? -1 : 1;
-          s.spread = 1.15 + Math.random() * 0.7;
-          s.tree = BIOMES[biomeRef.current].tree;
+          s.spread = 1.1 + Math.random() * 1.6;
+          s.scale = 0.8 + Math.random() * 0.7;
+          s.tree = BIOMES[biomeRef.current].kinds[rnd(BIOMES[biomeRef.current].kinds.length)];
         }
       }
 
@@ -290,9 +345,9 @@ export default function CarGame() {
       // steering smoothing
       carPos.current += (carLaneRef.current - carPos.current) * 0.28;
 
-      // gate approach
+      // gate approach (steady, not tied to boost — keeps decision time consistent)
       if (!paused.current) {
-        gateDist.current -= sp * dt;
+        gateDist.current -= GATE_SPEED * dt;
         if (!revealed.current && gateDist.current <= REVEAL_DIST) {
           revealed.current = true;
           setFriends((prev) => prev.map((f, i) => ({ ...f, lane: friendTargets.current[i] })));
@@ -426,6 +481,18 @@ export default function CarGame() {
       ? `${cx - halfW * roadNear.k},${roadNear.y} ${cx + halfW * roadNear.k},${roadNear.y} ${cx + halfW * roadFar.k},${roadFar.y} ${cx - halfW * roadFar.k},${roadFar.y}`
       : '';
 
+  // scalloped tree-canopy silhouette along the horizon (dense-forest backdrop)
+  let treelinePath = '';
+  if (w > 0) {
+    const bump = 32;
+    treelinePath = `M0 ${horizonY + 4}`;
+    for (let x = 0; x <= w; x += bump) {
+      const top = horizonY - 16 - ((x / bump) % 2 === 0 ? 10 : 0);
+      treelinePath += ` Q ${x + bump / 2} ${top} ${x + bump} ${horizonY + 2}`;
+    }
+    treelinePath += ` L ${w} ${horizonY + 10} L 0 ${horizonY + 10} Z`;
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.playWrap}>
@@ -482,13 +549,18 @@ export default function CarGame() {
                   />
                 ))}
 
-                {/* scenery (far first) */}
+                {/* dense tree-line silhouette hugging the horizon (leafy biomes) */}
+                {biome.treeline && (
+                  <Path d={treelinePath} fill={biome.hill} opacity={0.9} />
+                )}
+
+                {/* scenery (far first, so nearer trees overlap the far ones) */}
                 {[...scenery.current]
                   .sort((a, b) => b.dist - a.dist)
                   .map((s, i) => {
                     const p = proj(s.dist);
                     const x = cx + s.side * (1 + s.spread) * halfW * p.k;
-                    return <Tree key={`${i}-${s.side}`} x={x} y={p.y} scale={p.k * 1.1} kind={s.tree} />;
+                    return <Tree key={`${i}-${s.side}`} x={x} y={p.y} scale={p.k * s.scale * 1.15} kind={s.tree} />;
                   })}
 
                 {/* friends (ghost) — farther cars drawn first */}
@@ -507,11 +579,15 @@ export default function CarGame() {
                 <RearCar x={carX} y={carP.y} scale={carP.k} color={Brand.blue} />
               </Svg>
 
-              {/* answer gate tiles (overlay, projected) */}
+              {/* answer gate tiles — kept legible even far away: spacing + size are
+                  clamped so they read as a floating banner near the horizon, then grow
+                  and converge as they arrive. */}
               {round.options.map((opt, l) => {
                 const p = proj(gateDist.current);
-                const tileW = (2 * halfW) / LANES * 0.86;
-                const x = screenX(l, p.k);
+                const kx = Math.max(0.42, p.k); // don't let lanes fully converge (readability)
+                const tScale = Math.max(0.55, p.k); // don't shrink text into a dot
+                const tileW = Math.max(90, ((2 * halfW) / LANES) * 0.72);
+                const x = cx + laneWorld(l) * halfW * kx;
                 const isCorrect = flash && l === flash.correctLane;
                 const isYouWrong = flash && l === flash.youLane && flash.youLane !== flash.correctLane;
                 const bg = isCorrect ? Brand.blue : isYouWrong ? Brand.accent : Brand.card;
@@ -525,11 +601,11 @@ export default function CarGame() {
                       Wobbly.sm,
                       {
                         left: x - tileW / 2,
-                        top: p.y - 46 * p.k,
+                        top: p.y - 52 * tScale,
                         width: tileW,
                         backgroundColor: bg,
-                        opacity: 0.4 + p.k * 0.6,
-                        transform: [{ scale: Math.max(0.25, p.k) }],
+                        opacity: 0.82 + p.k * 0.18,
+                        transform: [{ scale: tScale }],
                       },
                     ]}
                   >

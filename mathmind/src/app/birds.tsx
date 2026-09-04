@@ -1,8 +1,8 @@
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Ellipse, Path, Polygon } from 'react-native-svg';
+import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Rect } from 'react-native-svg';
 
 import { BigButton } from '@/components/big-button';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
@@ -11,10 +11,11 @@ import { Brand, HandFonts, MaxContentWidth, Spacing, Wobbly, offsetShadow } from
 import { useStore } from '@/lib/store';
 import type { Difficulty } from '@/lib/types';
 
-// Bird Shooter: birds fly across the sky, each carrying a number. A question shows up
-// top — tap (shoot) the bird holding the correct answer. Right bird = score + combo and
-// a fresh flock; wrong bird flies off and breaks your streak. Correct hits feed a
-// mastery signal. 45-second round.
+// Bird Shooter: birds burst up out of the tall grass and fly toward the top of the
+// screen, each carrying a number. A gun turret sits in the middle of the meadow — read
+// the question and tap (shoot) the bird holding the correct answer; the gun swings to aim
+// and fires. Right bird = score + combo and a fresh flock; wrong = the shot misses and
+// your streak breaks. Correct hits feed a mastery signal. 45-second round.
 
 const ROUND_SECONDS = 45;
 const TICK_MS = 33;
@@ -25,9 +26,10 @@ interface Bird {
   value: number;
   correct: boolean;
   x: number; // 0..1 across the sky
-  y: number; // px within the sky
+  y: number; // px from top
+  vx: number; // fraction of width per second (drift)
+  vy: number; // px per second, upward
   dir: 1 | -1;
-  speed: number; // fraction of width per second
 }
 
 interface Problem {
@@ -53,7 +55,7 @@ function makeProblem(diff: Difficulty): Problem {
     const cap = [20, 50, 100][diff - 1];
     a = 1 + rnd(cap);
     b = 1 + rnd(a);
-    answer = a + 0 - b;
+    answer = a - b;
   }
   return { prompt: `${a} ${op} ${b}`, answer };
 }
@@ -68,7 +70,7 @@ function distractors(answer: number, n: number): number[] {
   return [...set];
 }
 
-/** A little side-on bird carrying nothing — the number rides in a tag beside it. */
+/** Side-on bird, wings flapping; the number rides in a tag beside it. */
 function BirdSprite({ w, up, dir }: { w: number; up: boolean; dir: 1 | -1 }) {
   const h = w * 0.75;
   return (
@@ -107,26 +109,44 @@ export default function BirdGame() {
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [flap, setFlap] = useState(false);
   const [pop, setPop] = useState<{ x: number; y: number; ok: boolean; key: number } | null>(null);
+  const [gunAngle, setGunAngle] = useState(0);
+  const [tracer, setTracer] = useState<{ x1: number; y1: number; x2: number; y2: number; ok: boolean; key: number } | null>(null);
 
   const idRef = useRef(0);
   const sizeRef = useRef(size);
   sizeRef.current = size;
 
-  // Spawn a fresh flock for a question: one correct bird + distractors, from both sides.
+  const grassH = size.h ? size.h * 0.16 : 0;
+  const gunX = size.w / 2;
+  const gunPivotY = size.h - grassH * 0.55;
+
+  // Static grass blades (computed once per size, so they don't flicker each frame).
+  const blades = useMemo(() => {
+    const out: { x: number; bh: number; tilt: number; dark: boolean }[] = [];
+    if (size.w > 0) {
+      const gH = size.h * 0.16;
+      for (let x = 6; x < size.w; x += 13) {
+        out.push({ x, bh: gH * (0.55 + Math.random() * 0.5), tilt: (Math.random() - 0.5) * 10, dark: Math.random() < 0.5 });
+      }
+    }
+    return out;
+  }, [size.w, size.h]);
+
   const spawnFlock = useCallback((p: Problem) => {
-    const h = sizeRef.current.h || 300;
+    const s = sizeRef.current;
     const values = [p.answer, ...distractors(p.answer, 3)].sort(() => Math.random() - 0.5);
+    const gH = (s.h || 300) * 0.16;
     const flock: Bird[] = values.map((value, i) => {
       const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-      const startX = dir === 1 ? -0.15 - i * 0.14 : 1.15 + i * 0.14;
       return {
         id: idRef.current++,
         value,
         correct: value === p.answer,
-        x: startX,
-        y: 40 + Math.random() * Math.max(60, h - 120),
+        x: 0.15 + (i + Math.random() * 0.6) * (0.7 / 4),
+        y: (s.h || 300) - gH * 0.3 + Math.random() * 30, // burst out of the grass
+        vx: (Math.random() - 0.5) * 0.12,
+        vy: 46 + Math.random() * 34 + diff * 6, // rise toward the top
         dir,
-        speed: 0.16 + Math.random() * 0.14 + diff * 0.02,
       };
     });
     setBirds(flock);
@@ -141,24 +161,24 @@ export default function BirdGame() {
   // Wing flap.
   useEffect(() => {
     if (phase !== 'playing') return;
-    const id = setInterval(() => setFlap((f) => !f), 190);
+    const id = setInterval(() => setFlap((f) => !f), 170);
     return () => clearInterval(id);
   }, [phase]);
 
-  // Movement loop.
+  // Movement loop — birds rise and drift; off the top edge = gone.
   useEffect(() => {
     if (phase !== 'playing') return;
     const id = setInterval(() => {
+      const s = sizeRef.current;
       setBirds((prev) => {
         let hadCorrect = false;
         const next = prev
-          .map((b) => ({ ...b, x: b.x + b.dir * b.speed * (TICK_MS / 1000) }))
+          .map((b) => ({ ...b, y: b.y - b.vy * (TICK_MS / 1000), x: b.x + b.vx * (TICK_MS / 1000) }))
           .filter((b) => {
-            const alive = b.x > -0.25 && b.x < 1.25;
+            const alive = b.y > -40 && b.x > -0.15 && b.x < 1.15;
             if (alive && b.correct) hadCorrect = true;
             return alive;
           });
-        // If the correct bird has flown off, that's a miss — send a new flock.
         if (prev.length > 0 && !hadCorrect) {
           setMisses((m) => m + 1);
           setCombo(0);
@@ -178,9 +198,9 @@ export default function BirdGame() {
       setTimeLeft((t) => {
         if (t <= 1) {
           clearInterval(id);
-          setScore((s) => {
-            setBest((b) => Math.max(b, s));
-            return s;
+          setScore((sc) => {
+            setBest((b) => Math.max(b, sc));
+            return sc;
           });
           setPhase('over');
           return 0;
@@ -194,38 +214,38 @@ export default function BirdGame() {
   const shoot = useCallback(
     (bird: Bird) => {
       if (phase !== 'playing') return;
-      const px = bird.x * sizeRef.current.w;
+      const s = sizeRef.current;
+      const bx = bird.x * s.w;
+      const by = bird.y;
+      // aim the gun at the bird
+      const angle = (Math.atan2(bx - s.w / 2, gunPivotY - by) * 180) / Math.PI;
+      setGunAngle(Math.max(-70, Math.min(70, angle)));
+      setTracer({ x1: s.w / 2, y1: gunPivotY, x2: bx, y2: by, ok: bird.correct, key: Date.now() });
+      setTimeout(() => setTracer(null), 150);
+
       if (bird.correct) {
         const pts = 10 + combo * 2;
-        setScore((s) => s + pts);
+        setScore((sc) => sc + pts);
         setCombo((c) => c + 1);
         setHits((n) => n + 1);
-        setPop({ x: px, y: bird.y, ok: true, key: Date.now() });
+        setPop({ x: bx, y: by, ok: true, key: Date.now() });
         recordTurn({
           id: `birds-${Date.now()}`,
           at: Date.now(),
           skillId: 'mult-facts',
           taskId: 'birds',
           studentAnswer: String(bird.value),
-          result: {
-            isCorrect: true,
-            isOnTrack: true,
-            misconceptionTag: null,
-            message: '',
-            hint: '',
-            difficultyDelta: 0,
-            masterySignal: 0.8,
-          },
+          result: { isCorrect: true, isOnTrack: true, misconceptionTag: null, message: '', hint: '', difficultyDelta: 0, masterySignal: 0.8 },
         });
         nextQuestion();
       } else {
         setCombo(0);
         setMisses((n) => n + 1);
-        setPop({ x: px, y: bird.y, ok: false, key: Date.now() });
+        setPop({ x: bx, y: by, ok: false, key: Date.now() });
         setBirds((prev) => prev.filter((b) => b.id !== bird.id));
       }
     },
-    [phase, combo, recordTurn, nextQuestion],
+    [phase, combo, recordTurn, nextQuestion, gunPivotY],
   );
 
   const start = useCallback(() => {
@@ -235,6 +255,8 @@ export default function BirdGame() {
     setMisses(0);
     setTimeLeft(ROUND_SECONDS);
     setPop(null);
+    setTracer(null);
+    setGunAngle(0);
     setPhase('playing');
     nextQuestion();
   }, [nextQuestion]);
@@ -251,16 +273,13 @@ export default function BirdGame() {
         <PaperBg />
         <View style={styles.menu}>
           <StickyTag label="BIRD SHOOTER" rotate={-3} style={{ alignSelf: 'center' }} />
-          <ThemedText type="title" style={styles.bigTitle}>
-            Shoot the answer!
-          </ThemedText>
+          <ThemedText type="title" style={styles.bigTitle}>Shoot the answer!</ThemedText>
           <ThemedText type="small" style={styles.center}>
-            Birds fly by carrying numbers. Read the question and tap the bird holding the
-            correct answer. Streaks score extra. You have {ROUND_SECONDS} seconds.
+            Birds burst out of the grass and fly up carrying numbers. Read the question and
+            tap the bird with the correct answer — the gun aims and fires. Streaks score
+            extra. You have {ROUND_SECONDS} seconds.
           </ThemedText>
-          {best > 0 && (
-            <ThemedText type="small" style={styles.center}>Your best so far: {best}</ThemedText>
-          )}
+          {best > 0 && <ThemedText type="small" style={styles.center}>Your best so far: {best}</ThemedText>}
           <BigButton label="Start round" variant="primary" onPress={start} style={{ marginTop: Spacing.two }} />
           <BigButton label="Back home" variant="ghost" tint={Brand.ink} onPress={() => router.replace('/')} />
         </View>
@@ -292,10 +311,11 @@ export default function BirdGame() {
 
   // ---- PLAYING --------------------------------------------------------------
   const low = timeLeft <= 10;
-  const badgeW = 46;
+  const w = size.w;
+  const h = size.h;
+
   return (
     <SafeAreaView style={styles.safe}>
-      <PaperBg />
       <View style={styles.playWrap}>
         {/* HUD */}
         <View style={styles.hud}>
@@ -314,36 +334,54 @@ export default function BirdGame() {
           <ThemedText style={styles.qText}>{problem.prompt} = ?</ThemedText>
         </SketchSurface>
 
-        {/* Sky */}
+        {/* Meadow */}
         <View style={styles.sky} onLayout={onLayout}>
-          {size.w > 0 &&
-            birds.map((b) => {
-              const left = b.x * size.w - badgeW / 2;
-              return (
-                <Pressable
-                  key={b.id}
-                  onPress={() => shoot(b)}
-                  hitSlop={10}
-                  style={[styles.bird, { left, top: b.y }]}
-                >
+          {w > 0 && (
+            <>
+              {/* sky backdrop: tracer, tall grass, gun turret (behind the birds) */}
+              <Svg width={w} height={h} style={StyleSheet.absoluteFill} pointerEvents="none">
+                {tracer && (
+                  <Line x1={tracer.x1} y1={tracer.y1} x2={tracer.x2} y2={tracer.y2} stroke={tracer.ok ? Brand.blue : Brand.accent} strokeWidth={3} strokeDasharray="6 6" strokeLinecap="round" />
+                )}
+
+                {/* tall grass strip */}
+                <Rect x={0} y={h - grassH} width={w} height={grassH} fill="#77b262" />
+                {blades.map((bl, i) => (
+                  <Path
+                    key={i}
+                    d={`M${bl.x} ${h} Q ${bl.x + bl.tilt} ${h - bl.bh * 0.6} ${bl.x + bl.tilt * 1.6} ${h - bl.bh}`}
+                    stroke={bl.dark ? '#3f7f3c' : '#5aa14e'}
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                    fill="none"
+                  />
+                ))}
+
+                {/* gun turret in the middle of the meadow */}
+                <G transform={`translate(${gunX}, ${gunPivotY}) rotate(${gunAngle})`}>
+                  <Rect x={-6} y={-52} width={12} height={52} rx={5} fill="#5b6570" stroke={Brand.ink} strokeWidth={2.5} />
+                  <Circle cx={0} cy={-52} r={5} fill={Brand.accent} stroke={Brand.ink} strokeWidth={2} />
+                </G>
+                <Ellipse cx={gunX} cy={gunPivotY + 6} rx={26} ry={16} fill="#8a949e" stroke={Brand.ink} strokeWidth={2.5} />
+                <Circle cx={gunX} cy={gunPivotY} r={13} fill="#6b7580" stroke={Brand.ink} strokeWidth={2.5} />
+              </Svg>
+
+              {/* birds (tappable, above the grass) */}
+              {birds.map((b) => (
+                <Pressable key={b.id} onPress={() => shoot(b)} hitSlop={10} style={[styles.bird, { left: b.x * w - 27, top: b.y }]}>
                   <BirdSprite w={54} up={flap} dir={b.dir} />
                   <View style={[styles.badge, Wobbly.sm]}>
                     <ThemedText style={styles.badgeText}>{b.value}</ThemedText>
                   </View>
                 </Pressable>
-              );
-            })}
+              ))}
 
-          {pop && (
-            <View
-              key={pop.key}
-              pointerEvents="none"
-              style={[styles.pop, { left: pop.x - 18, top: pop.y - 8, borderColor: pop.ok ? Brand.blue : Brand.accent }]}
-            >
-              <ThemedText type="smallBold" color={pop.ok ? Brand.blue : Brand.accent}>
-                {pop.ok ? 'HIT' : 'MISS'}
-              </ThemedText>
-            </View>
+              {pop && (
+                <View key={pop.key} pointerEvents="none" style={[styles.popTag, { left: pop.x - 18, top: pop.y - 8, borderColor: pop.ok ? Brand.blue : Brand.accent }]}>
+                  <ThemedText type="smallBold" color={pop.ok ? Brand.blue : Brand.accent}>{pop.ok ? 'HIT' : 'MISS'}</ThemedText>
+                </View>
+              )}
+            </>
           )}
         </View>
       </View>
@@ -365,37 +403,14 @@ const styles = StyleSheet.create({
   bigTitle: { textAlign: 'center', fontSize: 40, lineHeight: 46 },
   center: { textAlign: 'center', color: Brand.muted },
 
-  playWrap: {
-    flex: 1,
-    padding: Spacing.three,
-    gap: Spacing.two,
-    maxWidth: MaxContentWidth,
-    width: '100%',
-    alignSelf: 'center',
-  },
+  playWrap: { flex: 1, padding: Spacing.three, gap: Spacing.two, maxWidth: MaxContentWidth, width: '100%', alignSelf: 'center' },
   hud: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  comboTag: {
-    backgroundColor: Brand.postit,
-    borderWidth: 2,
-    borderColor: Brand.ink,
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
-    ...Wobbly.sm,
-    transform: [{ rotate: '-3deg' }],
-  },
+  comboTag: { backgroundColor: Brand.postit, borderWidth: 2, borderColor: Brand.ink, paddingHorizontal: Spacing.two, paddingVertical: 2, ...Wobbly.sm, transform: [{ rotate: '-3deg' }] },
   qCard: { alignItems: 'center', gap: 2 },
   qText: { fontFamily: HandFonts.heading, fontSize: 34, lineHeight: 40, color: Brand.ink },
 
-  sky: {
-    flex: 1,
-    backgroundColor: '#eaf1f7',
-    borderWidth: 3,
-    borderColor: Brand.ink,
-    ...Wobbly.md,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  bird: { position: 'absolute', alignItems: 'center' },
+  sky: { flex: 1, backgroundColor: '#dceff9', borderWidth: 3, borderColor: Brand.ink, ...Wobbly.md, overflow: 'hidden', position: 'relative' },
+  bird: { position: 'absolute', alignItems: 'center', zIndex: 2 },
   badge: {
     marginTop: -6,
     minWidth: 40,
@@ -408,12 +423,5 @@ const styles = StyleSheet.create({
     ...offsetShadow(2, Brand.ink),
   },
   badgeText: { fontFamily: HandFonts.heading, fontSize: 20, color: Brand.ink },
-  pop: {
-    position: 'absolute',
-    backgroundColor: Brand.card,
-    borderWidth: 2,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    ...Wobbly.sm,
-  },
+  popTag: { position: 'absolute', zIndex: 3, backgroundColor: Brand.card, borderWidth: 2, paddingHorizontal: 8, paddingVertical: 2, ...Wobbly.sm },
 });

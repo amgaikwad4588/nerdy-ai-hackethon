@@ -8,6 +8,20 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### Roadmap module 2 — camera opt-in → scoreboard gating
+- Store `scoreEligible` (session-only, **not persisted** — camera isn't on after reload),
+  set true when Focus Guard reaches "watching", false on off/error/unmount.
+- Focus Guard off-state now shows the **opt-in warning**: camera on = points count on the
+  class scoreboard; off = still study & play, just not ranked.
+- **Sprint + Racer** rank the player only when `scoreEligible`; otherwise the player is left
+  off the board and shown a "practice run — not on the scoreboard" badge + how to join.
+  Bird Shooter has no leaderboard, so it's not gated.
+
+### Roadmap module 1 — accessibility & settings
+- Settings store slice (`readAloud`/`captions`/`reduceMotion`, persisted) + `/settings`
+  screen (gear in Home top-right). Global `CaptionBar` subtitles wired to the shared speak
+  layer; read-aloud toggle gates TTS (captions still show); reduce-motion calms Milo.
+
 ### Misconception bank — expanded + live-demo cheat-sheet + tests
 The bank is a real pattern-matcher (each `detect()` fires on the *exact* wrong answer), now
 **9 misconceptions across all 6 skills** — several skills catch multiple distinct errors,

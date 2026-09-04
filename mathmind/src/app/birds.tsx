@@ -108,7 +108,7 @@ export default function BirdGame() {
   const [misses, setMisses] = useState(0);
   const [timeLeft, setTimeLeft] = useState(ROUND_SECONDS);
   const [flap, setFlap] = useState(false);
-  const [pop, setPop] = useState<{ x: number; y: number; ok: boolean; key: number } | null>(null);
+  const [pop, setPop] = useState<{ x: number; y: number; ok: boolean; key: number; big?: boolean } | null>(null);
   const [gunAngle, setGunAngle] = useState(0);
   const [tracer, setTracer] = useState<{ x1: number; y1: number; x2: number; y2: number; ok: boolean; key: number } | null>(null);
 
@@ -249,8 +249,10 @@ export default function BirdGame() {
         setCombo(0);
         setMisses((n) => n + 1);
         speedMult.current = Math.max(SPEED_FLOOR, speedMult.current - 0.1); // wrong bird → ease off a touch
-        setPop({ x: bx, y: by, ok: false, key: Date.now() });
-        setBirds((prev) => prev.filter((b) => b.id !== bird.id));
+        const key = Date.now();
+        setPop({ x: s.w / 2, y: s.h * 0.34, ok: false, key, big: true });
+        setTimeout(() => setPop((p) => (p && p.key === key ? null : p)), 850);
+        nextQuestion(); // no second chance — send the next wave
       }
     },
     [phase, combo, recordTurn, nextQuestion, gunPivotY],
@@ -385,7 +387,14 @@ export default function BirdGame() {
                 </Pressable>
               ))}
 
-              {pop && (
+              {pop && pop.big && (
+                <View key={pop.key} pointerEvents="none" style={styles.bigWrongWrap}>
+                  <View style={styles.bigWrong}>
+                    <ThemedText type="title" style={styles.bigWrongText}>WRONG!</ThemedText>
+                  </View>
+                </View>
+              )}
+              {pop && !pop.big && (
                 <View key={pop.key} pointerEvents="none" style={[styles.popTag, { left: pop.x - 18, top: pop.y - 8, borderColor: pop.ok ? Brand.blue : Brand.accent }]}>
                   <ThemedText type="smallBold" color={pop.ok ? Brand.blue : Brand.accent}>{pop.ok ? 'HIT' : 'MISS'}</ThemedText>
                 </View>
@@ -433,4 +442,16 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontFamily: HandFonts.heading, fontSize: 20, color: Brand.ink },
   popTag: { position: 'absolute', zIndex: 3, backgroundColor: Brand.card, borderWidth: 2, paddingHorizontal: 8, paddingVertical: 2, ...Wobbly.sm },
+  bigWrongWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', zIndex: 5 },
+  bigWrong: {
+    backgroundColor: Brand.card,
+    borderWidth: 4,
+    borderColor: Brand.accent,
+    paddingHorizontal: Spacing.five,
+    paddingVertical: Spacing.three,
+    transform: [{ rotate: '-4deg' }],
+    ...Wobbly.md,
+    ...offsetShadow(6, Brand.accent),
+  },
+  bigWrongText: { color: Brand.accent, fontSize: 52, lineHeight: 58, letterSpacing: 1 },
 });

@@ -89,6 +89,14 @@ export default function Home() {
           ))}
         </View>
 
+        {/* Games — reward + more practice */}
+        <StickyTag label="GAMES" rotate={-2} style={{ marginTop: Spacing.five }} />
+        <View style={{ gap: Spacing.three, marginTop: Spacing.two }}>
+          <BigButton label="Math Sprint" variant="secondary" tint={Brand.blue} onPress={() => router.push('/game')} />
+          <BigButton label="Highway Racer" variant="secondary" tint={Brand.blue} onPress={() => router.push('/car')} />
+          <BigButton label="Bird Shooter" variant="secondary" tint={Brand.blue} onPress={() => router.push('/birds')} />
+        </View>
+
         {/* Teacher entry — a pinned post-it */}
         <SketchSurface
           tone="postit"

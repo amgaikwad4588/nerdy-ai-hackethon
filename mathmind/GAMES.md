@@ -16,27 +16,25 @@ Shared rules for every game:
 Rapid-fire multiple-choice with a combo multiplier, live rank vs. classmates, and an
 end leaderboard. File: `src/app/game.tsx`. Skill: `mult-facts`.
 
-## 2. Highway Car Game — idea
-- Endless **highway**; the car drives straight and the student **steers between lanes**
-  (tap left / right, or drag) to **avoid obstacles**.
-- A **question is shown at the bottom of the screen**.
-- Obstacles are **numbers / operations** floating in the lanes: some are operators like
-  `+2`, `-7`, `x7`; others are candidate **answers to the question**.
-- The student must drive the car **into the correct answer** (or apply the right operator
-  to reach a target) and **dodge the wrong ones** — a wrong hit = crash / lose a life.
-- Speeds up gradually. Combo for a clean streak. Feeds mastery for the practiced skill.
-- Open Qs: is it "hit the correct answer tile" or "chain operators to reach a target"?
-  Steering = tap-lanes vs. drag. Lives vs. timer.
+## 2. Highway Racer — DONE
+File: `src/app/car.tsx`. Route `/car`. Skill: `mult-facts`.
+- 4-lane highway, question at the bottom. Four answer tiles slide down (one per lane);
+  steer your car (tap a lane, or ◄ ► buttons) into the **correct** lane before the gate
+  arrives. **Correct = speed up (big distance), wrong = slow down.**
+- **Fake multiplayer:** 3 friend bots with dummy Indian names (Aarav, Diya, Kabir, …),
+  **translucent** cars, race you up the road; their car height = their race distance.
+  Each round they pick a lane (accuracy = their skill). First car to the finish wins;
+  end screen ranks everyone.
+- Later: real networked multiplayer; drag-to-steer; operator tiles (`+2 -7 x7`) as an
+  alt mode; crash/lives variant.
 
-## 3. Bird Shooter (Gun Game) — idea
-- **Birds fly across the screen**, each **carrying a number**.
-- A **question** is shown; the student **taps (shoots) the bird holding the correct
-  answer**. Tapping a wrong bird = miss / penalty.
-- Birds enter from the sides at varying heights/speeds; shooting the right one scores +
-  combo, then a new question loads.
-- Feeds mastery for the practiced skill.
-- Open Qs: single correct bird per question vs. "shoot all birds that are multiples of N"
-  style; ammo/time limit; do wrong birds fly off or cost a life?
+## 3. Bird Shooter — DONE
+File: `src/app/birds.tsx`. Route `/birds`. Skill: `mult-facts`.
+- Birds fly across the sky (from both sides, varying height/speed), each carrying a
+  number. Question up top; **tap the bird holding the correct answer**. Right = score +
+  combo and a fresh flock; wrong bird flies off and breaks the streak. 45s round, end
+  screen with hits + accuracy.
+- Later: "shoot all multiples of N" mode; ammo limit; power-ups.
 
 ---
 

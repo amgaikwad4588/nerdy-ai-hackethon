@@ -8,6 +8,29 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### Misconception bank — expanded + live-demo cheat-sheet + tests
+The bank is a real pattern-matcher (each `detect()` fires on the *exact* wrong answer), now
+**9 misconceptions across all 6 skills** — several skills catch multiple distinct errors,
+so a judge poking it sees generalization, not one scripted case. `npm test` proves all fire.
+
+**To trigger any of them live** (numbers vary per generated task — apply the rule):
+
+| Skill (screen) | Task shape | Type this wrong answer | Misconception caught |
+|---|---|---|---|
+| Comparing Fractions | "Which is bigger: 1/4 or 1/8?" (choice) | pick the one with the **bigger bottom number** | bigger-denominator-bigger |
+| Multiplication Facts | "a × b?" | type **a + b** (e.g. 7×2 → 9) | add-instead-of-multiply |
+| Multiplication Facts | "a × b?" | type **a × (b−1)** (one group short, e.g. 7×2 → 7) | skip-count-short |
+| Arrays & Area | "r rows, c dots each — how many?" | type **r + c** | added-rows-and-columns |
+| Arrays & Area | "r rows, c dots each" | type **2×(r+c)−4** (border only) | perimeter-not-area |
+| Multi-digit Addition | "a + b?" | add each column **without carrying** (concat column sums, e.g. 34+26 → 510) | no-regrouping |
+| Equivalent Fractions | "n/d = _/(d·k)" | type **n** (leave top unchanged) | scaled-denominator-only |
+| Equivalent Fractions | "n/d = _/(d·k)" | type **n + (d·k − d)** (added, not multiplied) | add-same-to-both |
+| Place Value | "value of the … digit in N?" | type just the **digit** (e.g. 3, not 300) | ignored-place-zero |
+
+Note: the offline **mock** uses `detect()` directly, so these fire deterministically even
+without an API key — the most reliable way to demo the matcher. See [GAPS.md](./GAPS.md)
+for the structured-output validation that also whitelists tags on the live Gemini path.
+
 ### Student progress dashboard (`/progress`)
 - New student-facing dashboard: overall mastery ring, level/stars/streak, per-skill status
   (Mastered / Getting there / Keep practicing), badges, a "this week" bar chart, recent

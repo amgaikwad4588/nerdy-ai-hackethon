@@ -6,7 +6,7 @@
 // enforce correctness locally (we already know the right answer) so app logic stays
 // deterministic — the model supplies the *coaching*, not the grading.
 
-import { isCorrect, MISCONCEPTIONS_BY_SKILL, SKILL_BY_ID } from '../curriculum';
+import { detectMisconception, isCorrect, MISCONCEPTIONS_BY_SKILL, SKILL_BY_ID } from '../curriculum';
 import type { Task, TutorResult } from '../types';
 
 const GEMINI_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
@@ -55,6 +55,18 @@ async function generate(body: unknown): Promise<string> {
   return text;
 }
 
+/** Tolerant JSON parse: strips ``` fences and extracts the first {...} object. */
+function safeJson(text: string): Record<string, unknown> {
+  const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const m = cleaned.match(/\{[\s\S]*\}/);
+    if (m) return JSON.parse(m[0]);
+    throw new Error('gemini: unparseable JSON');
+  }
+}
+
 export async function geminiTutorTurn(task: Task, answer: string, thinking?: string): Promise<TutorResult> {
   const skill = SKILL_BY_ID[task.skillId];
   const misconceptions = MISCONCEPTIONS_BY_SKILL[task.skillId].map((m) => ({
@@ -81,15 +93,22 @@ export async function geminiTutorTurn(task: Task, answer: string, thinking?: str
     generationConfig: { responseMimeType: 'application/json', responseSchema: TUTOR_SCHEMA, temperature: 0.6 },
   });
 
-  const raw = JSON.parse(text) as Partial<TutorResult> & { misconceptionTag?: string };
+  const raw = safeJson(text) as Partial<TutorResult> & { misconceptionTag?: string };
   const delta = Math.max(-1, Math.min(1, Math.round(Number(raw.difficultyDelta ?? 0)))) as -1 | 0 | 1;
-  const tag = raw.misconceptionTag && raw.misconceptionTag !== 'none' ? raw.misconceptionTag : null;
+
+  // Validate the tag against OUR bank — never trust a hallucinated tag. Also
+  // deterministically fall back to the local detector so tagging is reliable even if the
+  // model missed it.
+  const allowed = new Set(misconceptions.map((m) => m.tag));
+  const modelTag = raw.misconceptionTag && allowed.has(raw.misconceptionTag) ? raw.misconceptionTag : null;
+  const localTag = detectMisconception(task, answer)?.tag ?? null;
+  const tag = correct ? null : (modelTag ?? localTag);
 
   return {
     // Grade deterministically; the model provides the coaching, not the verdict.
     isCorrect: correct,
     isOnTrack: correct ? true : Boolean(raw.isOnTrack),
-    misconceptionTag: correct ? null : tag,
+    misconceptionTag: tag,
     message: String(raw.message ?? '').trim() || (correct ? 'Nice work — how did you figure it out?' : "Let's take another look."),
     hint: correct ? '' : String(raw.hint ?? '').trim(),
     difficultyDelta: delta,

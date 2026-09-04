@@ -163,7 +163,8 @@ const generators: Record<string, Generator> = {
     let n1: number, d1: number, n2: number, d2: number;
     if (difficulty < 3) {
       const num = pick(rng, [1, 2, 3]);
-      const ds = [2, 3, 4, 6, 8];
+      // Keep proper fractions (< 1): denominators strictly greater than the numerator.
+      const ds = [2, 3, 4, 6, 8].filter((d) => d > num);
       d1 = pick(rng, ds);
       do {
         d2 = pick(rng, ds);
@@ -293,6 +294,18 @@ export const MISCONCEPTIONS: Misconception[] = [
     },
   },
   {
+    tag: 'skip-count-short',
+    skillId: 'mult-facts',
+    description: 'Skip-counts but stops one group early (counts 4 × 3 as 4 + 4 = 8).',
+    remediation:
+      'Count every group. 4 × 3 is three fours: 4, 8, 12 — don’t stop a group early.',
+    detect: (task, answer) => {
+      const { a, b } = task.meta as Record<string, number>;
+      const val = Number(norm(answer));
+      return (val === a * (b - 1) || val === (a - 1) * b) && val !== a * b;
+    },
+  },
+  {
     tag: 'perimeter-not-area',
     skillId: 'mult-arrays',
     description: 'Counts the outside edge (perimeter) instead of the whole array (area).',
@@ -302,6 +315,28 @@ export const MISCONCEPTIONS: Misconception[] = [
       const { rows, cols } = task.meta as Record<string, number>;
       const perimeter = 2 * (rows + cols) - 4;
       return norm(answer) === norm(String(perimeter)) && perimeter !== rows * cols;
+    },
+  },
+  {
+    tag: 'added-rows-and-columns',
+    skillId: 'mult-arrays',
+    description: 'Adds the rows and columns instead of multiplying them (3 rows, 4 cols → 7).',
+    remediation:
+      'Every row has the same number of dots. Multiply rows × columns to fill the whole array.',
+    detect: (task, answer) => {
+      const { rows, cols } = task.meta as Record<string, number>;
+      return norm(answer) === norm(String(rows + cols)) && rows + cols !== rows * cols;
+    },
+  },
+  {
+    tag: 'scaled-denominator-only',
+    skillId: 'frac-equiv',
+    description: 'Scales the denominator but leaves the numerator unchanged (1/2 = 1/6).',
+    remediation:
+      'Whatever you multiply the bottom by, multiply the top by the same amount.',
+    detect: (task, answer) => {
+      const { n, k } = task.meta as Record<string, number>;
+      return norm(answer) === norm(String(n)) && n !== n * k;
     },
   },
   {

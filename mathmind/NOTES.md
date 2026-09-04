@@ -8,6 +8,16 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### Student progress dashboard (`/progress`)
+- New student-facing dashboard: overall mastery ring, level/stars/streak, per-skill status
+  (Mastered / Getting there / Keep practicing), badges, a "this week" bar chart, recent
+  games, and a "next challenge" CTA. Entry from Home ("See my progress").
+- **Dummy data:** real fields (mastery/xp/streak) come from the store, and it **auto-seeds
+  `loadDemoData()` only if the store is empty** (won't wipe real play). The weekly bars
+  (`WEEK`) and recent-games list (`RECENT_GAMES`) are clearly-dummy consts in
+  `src/app/progress.tsx` — the store doesn't track minutes/game-history yet. Replace with
+  real logging for production.
+
 ### Live tutor via Gemini (free key) + Milo game coaching
 - **Decision:** Added a **Google Gemini** live-tutor brain (free tier) as the preferred
   live path, since a free key is cheaper than Claude for the hackathon. Dispatch order in

@@ -40,7 +40,10 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="learn" options={{ title: 'My Practice' }} />
+        <Stack.Screen name="progress" options={{ title: 'My Progress' }} />
         <Stack.Screen name="game" options={{ title: 'Math Sprint', presentation: 'modal' }} />
+        <Stack.Screen name="car" options={{ title: 'Highway Racer', presentation: 'modal' }} />
+        <Stack.Screen name="birds" options={{ title: 'Bird Shooter', presentation: 'modal' }} />
         <Stack.Screen name="teacher" options={{ title: 'Class Notebook' }} />
       </Stack>
     </>

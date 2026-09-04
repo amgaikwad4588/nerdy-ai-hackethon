@@ -65,6 +65,16 @@ export default function Home() {
               router.push('/learn');
             }}
           />
+          <BigButton
+            label="See my progress"
+            variant="ghost"
+            tint={Brand.blue}
+            onPress={() => {
+              setRole('student');
+              router.push('/progress');
+            }}
+            style={{ marginTop: Spacing.two }}
+          />
         </SketchSurface>
 
         <StickyTag label="YOUR SKILLS" rotate={-3} style={{ marginTop: Spacing.four }} />

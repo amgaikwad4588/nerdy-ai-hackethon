@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BigButton } from '@/components/big-button';
 import { Buddy } from '@/components/buddy';
 import { MasteryRing } from '@/components/mastery-ring';
+import { SettingsButton } from '@/components/settings-button';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -42,6 +43,7 @@ export default function Home() {
           <View style={{ transform: [{ rotate: '4deg' }] }}>
             <MasteryRing level={overall} size={68} color={Brand.blue} />
           </View>
+          <SettingsButton style={{ marginLeft: Spacing.three }} />
         </View>
 
         {/* Milo greets the student — tap him to hear it */}
@@ -129,14 +131,6 @@ export default function Home() {
             }}
           />
         </SketchSurface>
-
-        <BigButton
-          label="Settings"
-          variant="ghost"
-          tint={Brand.ink}
-          onPress={() => router.push('/settings')}
-          style={{ marginTop: Spacing.four }}
-        />
       </ScrollView>
     </SafeAreaView>
   );

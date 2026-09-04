@@ -115,6 +115,11 @@ export default function BirdGame() {
   const idRef = useRef(0);
   const sizeRef = useRef(size);
   sizeRef.current = size;
+  // Adaptive difficulty: birds start slow and get faster as you hit; misses slow them
+  // back down. A gentle, self-tuning challenge.
+  const speedMult = useRef(0.7);
+  const SPEED_FLOOR = 0.55;
+  const SPEED_CAP = 1.8;
 
   const grassH = size.h ? size.h * 0.16 : 0;
   const gunX = size.w / 2;
@@ -145,7 +150,7 @@ export default function BirdGame() {
         x: 0.15 + (i + Math.random() * 0.6) * (0.7 / 4),
         y: (s.h || 300) - gH * 0.3 + Math.random() * 30, // burst out of the grass
         vx: (Math.random() - 0.5) * 0.12,
-        vy: 46 + Math.random() * 34 + diff * 6, // rise toward the top
+        vy: (30 + Math.random() * 22 + diff * 4) * speedMult.current, // rise speed scales with adaptive difficulty
         dir,
       };
     });
@@ -182,6 +187,7 @@ export default function BirdGame() {
         if (prev.length > 0 && !hadCorrect) {
           setMisses((m) => m + 1);
           setCombo(0);
+          speedMult.current = Math.max(SPEED_FLOOR, speedMult.current - 0.15); // missed it entirely → ease off
           setTimeout(nextQuestion, 0);
           return [];
         }
@@ -225,6 +231,7 @@ export default function BirdGame() {
 
       if (bird.correct) {
         const pts = 10 + combo * 2;
+        speedMult.current = Math.min(SPEED_CAP, speedMult.current + 0.12); // nailed it → speed up
         setScore((sc) => sc + pts);
         setCombo((c) => c + 1);
         setHits((n) => n + 1);
@@ -241,6 +248,7 @@ export default function BirdGame() {
       } else {
         setCombo(0);
         setMisses((n) => n + 1);
+        speedMult.current = Math.max(SPEED_FLOOR, speedMult.current - 0.1); // wrong bird → ease off a touch
         setPop({ x: bx, y: by, ok: false, key: Date.now() });
         setBirds((prev) => prev.filter((b) => b.id !== bird.id));
       }
@@ -257,6 +265,7 @@ export default function BirdGame() {
     setPop(null);
     setTracer(null);
     setGunAngle(0);
+    speedMult.current = 0.7; // start slow every round
     setPhase('playing');
     nextQuestion();
   }, [nextQuestion]);

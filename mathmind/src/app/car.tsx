@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, G, Line, LinearGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
 
 import { BigButton } from '@/components/big-button';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
@@ -31,12 +31,12 @@ const REVEAL_DIST = 3.2; // friends show their lane choice
 const BIOME_SECS = 9;
 const TICK_MS = 33;
 
-type TreeKind = 'pine' | 'round' | 'bush' | 'jungle' | 'palm' | 'cactus' | 'rock';
+type TreeKind = 'pine' | 'round' | 'bush' | 'jungle' | 'palm' | 'cactus' | 'rock' | 'deer' | 'camel' | 'elephant';
 
 const BIOMES: { name: string; ground: string; hill: string; treeline: boolean; kinds: TreeKind[] }[] = [
-  { name: 'grass', ground: '#8fc07a', hill: '#79ad64', treeline: true, kinds: ['round', 'pine', 'bush', 'round', 'bush'] },
-  { name: 'desert', ground: '#e7cf9c', hill: '#d8bd82', treeline: false, kinds: ['cactus', 'rock', 'cactus', 'bush'] },
-  { name: 'jungle', ground: '#4f9a4a', hill: '#3f7f3c', treeline: true, kinds: ['jungle', 'palm', 'jungle', 'round', 'bush'] },
+  { name: 'grass', ground: '#8fc07a', hill: '#79ad64', treeline: true, kinds: ['round', 'pine', 'bush', 'round', 'bush', 'pine', 'deer'] },
+  { name: 'desert', ground: '#e7cf9c', hill: '#d8bd82', treeline: false, kinds: ['cactus', 'rock', 'cactus', 'bush', 'rock', 'camel'] },
+  { name: 'jungle', ground: '#4f9a4a', hill: '#3f7f3c', treeline: true, kinds: ['jungle', 'palm', 'jungle', 'round', 'bush', 'palm', 'elephant', 'deer'] },
 ];
 
 const FRIENDS_POOL = [
@@ -176,6 +176,45 @@ function Tree({ x, y, scale, kind }: { x: number; y: number; scale: number; kind
           <Circle cx={0} cy={-38} r={16} fill={GREEN_LT} stroke={ink} strokeWidth={2} />
         </G>
       );
+    case 'deer':
+      return (
+        <G transform={t}>
+          <Line x1={-11} y1={0} x2={-11} y2={-15} stroke="#7a4a28" strokeWidth={3} strokeLinecap="round" />
+          <Line x1={-5} y1={0} x2={-5} y2={-15} stroke="#7a4a28" strokeWidth={3} strokeLinecap="round" />
+          <Line x1={6} y1={0} x2={6} y2={-15} stroke="#7a4a28" strokeWidth={3} strokeLinecap="round" />
+          <Line x1={12} y1={0} x2={12} y2={-15} stroke="#7a4a28" strokeWidth={3} strokeLinecap="round" />
+          <Ellipse cx={0} cy={-22} rx={16} ry={9} fill="#a56a3e" stroke={ink} strokeWidth={2} />
+          <Path d="M12 -26 L21 -42" stroke="#a56a3e" strokeWidth={6} strokeLinecap="round" />
+          <Ellipse cx={23} cy={-44} rx={6} ry={4} fill="#a56a3e" stroke={ink} strokeWidth={2} />
+          <Line x1={22} y1={-48} x2={19} y2={-56} stroke="#7a4a28" strokeWidth={2} strokeLinecap="round" />
+          <Line x1={24} y1={-48} x2={28} y2={-56} stroke="#7a4a28" strokeWidth={2} strokeLinecap="round" />
+        </G>
+      );
+    case 'camel':
+      return (
+        <G transform={t}>
+          <Line x1={-12} y1={0} x2={-12} y2={-20} stroke="#c79a5b" strokeWidth={4} strokeLinecap="round" />
+          <Line x1={-5} y1={0} x2={-5} y2={-20} stroke="#c79a5b" strokeWidth={4} strokeLinecap="round" />
+          <Line x1={6} y1={0} x2={6} y2={-20} stroke="#c79a5b" strokeWidth={4} strokeLinecap="round" />
+          <Line x1={13} y1={0} x2={13} y2={-20} stroke="#c79a5b" strokeWidth={4} strokeLinecap="round" />
+          <Path d="M-16 -22 Q-10 -36 -2 -24 Q6 -38 16 -24 L16 -20 Q0 -16 -16 -20 Z" fill="#d9ab68" stroke={ink} strokeWidth={2} strokeLinejoin="round" />
+          <Path d="M16 -24 Q24 -30 22 -44" stroke="#d9ab68" strokeWidth={6} fill="none" strokeLinecap="round" />
+          <Ellipse cx={23} cy={-46} rx={5} ry={4} fill="#d9ab68" stroke={ink} strokeWidth={2} />
+        </G>
+      );
+    case 'elephant':
+      return (
+        <G transform={t}>
+          <Rect x={-18} y={-18} width={7} height={18} rx={3} fill="#9aa0a6" stroke={ink} strokeWidth={2} />
+          <Rect x={-6} y={-18} width={7} height={18} rx={3} fill="#9aa0a6" stroke={ink} strokeWidth={2} />
+          <Rect x={8} y={-18} width={7} height={18} rx={3} fill="#9aa0a6" stroke={ink} strokeWidth={2} />
+          <Ellipse cx={0} cy={-32} rx={22} ry={16} fill="#a9afb5" stroke={ink} strokeWidth={2} />
+          <Circle cx={22} cy={-34} r={12} fill="#a9afb5" stroke={ink} strokeWidth={2} />
+          <Path d="M30 -30 Q38 -22 34 -6" stroke="#a9afb5" strokeWidth={7} fill="none" strokeLinecap="round" />
+          <Circle cx={15} cy={-30} r={7} fill="#9aa0a6" stroke={ink} strokeWidth={1.5} />
+          <Circle cx={24} cy={-36} r={1.8} fill={ink} />
+        </G>
+      );
     default: // pine
       return (
         <G transform={t}>
@@ -278,7 +317,9 @@ export default function CarGame() {
       setCombo(0);
       setDist((d) => Math.min(FINISH, d + SLOW));
     }
-    setFriends((prev) => prev.map((f, i) => ({ ...f, dist: Math.min(FINISH, f.dist + (friendTargets.current[i] === r.correctLane ? BOOST : SLOW) + rnd(3)) })));
+    // Friends are racing their OWN questions — each independently gets theirs right with
+    // probability = skill. Nothing to do with the player's answer/lane.
+    setFriends((prev) => prev.map((f) => ({ ...f, dist: Math.min(FINISH, f.dist + (Math.random() < f.skill ? BOOST : SLOW) + rnd(3)) })));
   }, [recordTurn]);
 
   const beginRound = useCallback((r: Round) => {
@@ -286,8 +327,10 @@ export default function CarGame() {
     revealed.current = false;
     setFlash(null);
     setRound(r);
+    // Friends just weave to a random cruising lane — they're on their own problems, so
+    // their lane has nothing to do with the player's correct answer.
     setFriends((prev) => {
-      friendTargets.current = prev.map((f) => (Math.random() < f.skill ? r.correctLane : rnd(LANES)));
+      friendTargets.current = prev.map(() => rnd(LANES));
       return prev;
     });
     gateDist.current = FAR;
@@ -299,12 +342,12 @@ export default function CarGame() {
     return k[rnd(k.length)];
   }, []);
 
-  const COUNT = 26;
+  const COUNT = 44; // dense enough that the roadside never has an empty patch
   const seedScenery = useCallback(() => {
     scenery.current = Array.from({ length: COUNT }).map((_, i) => ({
       side: i % 2 === 0 ? -1 : (1 as -1 | 1),
-      spread: 1.1 + Math.random() * 1.6, // some hug the road, some sit deep in the trees
-      dist: 0.4 + (i / COUNT) * FAR + Math.random() * 0.4,
+      spread: 1.08 + Math.random() * 1.7, // some hug the road, some sit deep in the trees
+      dist: 0.3 + (Math.floor(i / 2) / (COUNT / 2)) * FAR + Math.random() * 0.3, // even depth on both sides
       scale: 0.8 + Math.random() * 0.7,
       tree: pickKind(),
     }));

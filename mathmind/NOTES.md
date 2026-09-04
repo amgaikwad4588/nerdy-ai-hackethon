@@ -8,6 +8,16 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### Roadmap module 3 — Milo cheers + natural voice (ElevenLabs)
+- **Natural voice:** `speak()` now prefers **ElevenLabs** on web when
+  `EXPO_PUBLIC_ELEVENLABS_API_KEY` is set (voice/model overridable), synthesizing mp3 and
+  playing it via the browser `Audio` API; **falls back to device TTS** on any error or when
+  no key/native. Captions + Milo's mouth still sync either way. Caveats: client-side key is
+  demo-grade (move server-side later); browser CORS to the ElevenLabs endpoint is
+  unverified — fallback covers it. Not yet tested with a real key.
+- **Milo cheers:** the session-done screen (game-unlock moment) now shows a cheering Milo
+  and auto-speaks the unlock line. Game-over screens already cheer via `MiloCoach`.
+
 ### Roadmap module 2 — camera opt-in → scoreboard gating
 - Store `scoreEligible` (session-only, **not persisted** — camera isn't on after reload),
   set true when Focus Guard reaches "watching", false on off/error/unmount.

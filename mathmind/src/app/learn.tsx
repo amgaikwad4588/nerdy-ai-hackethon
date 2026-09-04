@@ -76,6 +76,17 @@ export default function Learn() {
     };
   }, [nextTask]);
 
+  // Milo cheers the moment a session wraps (and a game may unlock).
+  useEffect(() => {
+    if (phase !== 'done') return;
+    const unlocked = (mastery[pickSkillId(mastery)] ?? 0) >= MASTERY_THRESHOLD;
+    speak(
+      unlocked
+        ? `Awesome, ${studentName}! You unlocked a game!`
+        : `Great focus, ${studentName}! Keep practicing to unlock a game.`,
+    );
+  }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function submit(chosen?: string) {
     const finalAnswer = chosen ?? answer;
     if (!task || !finalAnswer.trim() || busy) return;
@@ -118,6 +129,11 @@ export default function Learn() {
       <SafeAreaView style={styles.safe}>
         <PaperBg />
         <View style={styles.centered}>
+          <Buddy
+            mood="cheer"
+            message={unlocked ? `Awesome, ${studentName}! You unlocked a game.` : 'Great focus! Keep going to unlock a game.'}
+            style={{ marginBottom: Spacing.three }}
+          />
           <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={{ gap: Spacing.two }}>
             <ThemedText type="title" style={{ color: Brand.blue, textAlign: 'center' }}>
               Great focus!

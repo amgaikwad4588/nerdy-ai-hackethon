@@ -5,12 +5,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BigButton } from '@/components/big-button';
 import { Buddy } from '@/components/buddy';
 import { MasteryRing } from '@/components/mastery-ring';
-import { DashedDivider, PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
+import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
 import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
 import { DOMAIN_LABEL, SKILLS } from '@/lib/curriculum';
 import { MASTERY_THRESHOLD, useStore } from '@/lib/store';
-import { tutorMode } from '@/lib/tutor';
 
 export default function Home() {
   const router = useRouter();
@@ -120,11 +119,6 @@ export default function Home() {
             }}
           />
         </SketchSurface>
-
-        <DashedDivider style={{ marginTop: Spacing.five }} />
-        <ThemedText type="small" style={styles.footer}>
-          Tutor: {tutorMode === 'live' ? 'Live (Claude)' : 'Offline demo'} · 6 skills across 3 domains
-        </ThemedText>
       </ScrollView>
     </SafeAreaView>
   );
@@ -171,5 +165,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.three,
   },
-  footer: { textAlign: 'center', color: Brand.muted, marginTop: Spacing.two },
 });

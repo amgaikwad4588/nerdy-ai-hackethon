@@ -8,6 +8,18 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### Roadmap module 5 — reading-friendly font + high contrast (a11y part 2)
+- Two new settings (`readableFont`, `highContrast`), wired through `ThemedText` so they
+  apply app-wide: reading-friendly swaps the handwriting for a plain legible font stack
+  (Verdana/Segoe/Tahoma on web) + letter-spacing; high contrast forces near-black text
+  (and bold in readable mode). No new font dependency (system stack) — a real Lexend/
+  OpenDyslexic asset is a future upgrade.
+
+### Roadmap module 4 — parent view
+- Read-only `/parent`: plain-language "how they're doing", "what we're working on" with a
+  per-skill at-home activity, and a skills overview. Home "For parents" entry. Seeds demo
+  data if empty. Closes GAPS #5.
+
 ### Roadmap module 3 — Milo cheers + natural voice (ElevenLabs)
 - **Natural voice:** `speak()` now prefers **ElevenLabs** on web when
   `EXPO_PUBLIC_ELEVENLABS_API_KEY` is set (voice/model overridable), synthesizing mp3 and

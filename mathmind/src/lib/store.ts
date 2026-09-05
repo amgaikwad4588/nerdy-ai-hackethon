@@ -20,6 +20,8 @@ export interface AppSettings {
   readAloud: boolean; // Milo speaks aloud (TTS)
   captions: boolean; // show on-screen subtitles of what's spoken
   reduceMotion: boolean; // calm the animations (buddy bob, game flourishes)
+  readableFont: boolean; // swap handwriting for a plain, legible font (dyslexia-friendlier)
+  highContrast: boolean; // darker, bolder text for low-vision
 }
 
 interface AppState {
@@ -66,7 +68,7 @@ export const useStore = create<AppState>()(
       events: [],
       xp: 0,
       streak: 0,
-      settings: { readAloud: true, captions: true, reduceMotion: false },
+      settings: { readAloud: true, captions: true, reduceMotion: false, readableFont: false, highContrast: false },
       scoreEligible: false,
 
       setRole: (role) => set({ role }),

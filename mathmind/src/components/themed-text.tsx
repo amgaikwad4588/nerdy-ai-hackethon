@@ -1,6 +1,7 @@
-import { StyleSheet, Text, type TextProps } from 'react-native';
+import { Platform, StyleSheet, Text, type TextProps, type TextStyle } from 'react-native';
 
 import { Brand, HandFonts } from '@/constants/theme';
+import { useStore } from '@/lib/store';
 
 export type ThemedTextProps = TextProps & {
   type?: 'default' | 'title' | 'small' | 'smallBold' | 'subtitle' | 'link' | 'linkPrimary' | 'code';
@@ -8,12 +9,28 @@ export type ThemedTextProps = TextProps & {
   color?: string;
 };
 
+// A plain, highly legible font stack for the reading-friendly (dyslexia-friendlier) mode.
+const READABLE_FONT = Platform.select({ web: 'Verdana, "Segoe UI", Tahoma, sans-serif', default: 'sans-serif' });
+
 /**
  * All type is handwritten: Kalam (felt-tip marker) for headings and emphasis,
- * Patrick Hand for body. Weight is baked into the family, so we never set
- * fontWeight. Default colour is soft pencil black on paper.
+ * Patrick Hand for body. Accessibility settings can swap to a plain legible font and/or
+ * boost contrast, applied here so the whole app follows.
  */
 export function ThemedText({ style, type = 'default', color, ...rest }: ThemedTextProps) {
+  const readableFont = useStore((s) => s.settings.readableFont);
+  const highContrast = useStore((s) => s.settings.highContrast);
+
+  const a11y: TextStyle = {};
+  if (readableFont) {
+    a11y.fontFamily = READABLE_FONT;
+    a11y.letterSpacing = 0.2;
+  }
+  if (highContrast) {
+    if (!color) a11y.color = '#000';
+    if (readableFont) a11y.fontWeight = '700';
+  }
+
   return (
     <Text
       style={[
@@ -27,6 +44,7 @@ export function ThemedText({ style, type = 'default', color, ...rest }: ThemedTe
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
         style,
+        a11y,
       ]}
       {...rest}
     />

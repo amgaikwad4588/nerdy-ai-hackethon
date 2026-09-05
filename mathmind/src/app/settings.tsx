@@ -85,6 +85,18 @@ export default function Settings() {
             value={settings.reduceMotion}
             onToggle={() => toggle('reduceMotion')}
           />
+          <Row
+            title="Reading-friendly text"
+            desc="Swap the handwriting for a plain, easy-to-read font."
+            value={settings.readableFont}
+            onToggle={() => toggle('readableFont')}
+          />
+          <Row
+            title="High contrast"
+            desc="Darker, bolder text that's easier to see."
+            value={settings.highContrast}
+            onToggle={() => toggle('highContrast')}
+          />
         </View>
 
         <BigButton label="Back home" variant="ghost" tint={Brand.ink} onPress={() => router.replace('/')} style={{ marginTop: Spacing.five }} />

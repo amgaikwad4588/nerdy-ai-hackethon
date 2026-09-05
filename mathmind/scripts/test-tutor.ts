@@ -6,7 +6,10 @@
 // consistent. This is what guards against silent drift in tagging logic.
 
 import { detectMisconception, generateTask, isCorrect, MISCONCEPTIONS } from '../src/lib/curriculum.ts';
+import { nextDifficulty, nextMastery } from '../src/lib/mastery.ts';
 import type { Difficulty } from '../src/lib/types.ts';
+
+const MASTERY_THRESHOLD = 0.8;
 
 let passed = 0;
 let failed = 0;
@@ -76,6 +79,38 @@ for (const skill of ['place-value', 'multi-add', 'mult-facts', 'mult-arrays', 'f
   }
   clean ? ok(`${skill}: correct answers never mis-flagged`) : fail(`${skill}: a correct answer was flagged or mis-scored`);
 }
+
+// 4) Mastery model — EMA update + difficulty clamping.
+console.log('Mastery model');
+const approx = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+
+// Correct answer pulls toward the signal at the up-rate.
+approx(nextMastery(0, 1, true), 0.34) ? ok('correct pulls up by the up-rate (0 -> 0.34)') : fail('up-rate wrong');
+// Wrong answer pulls down more gently.
+nextMastery(0.9, 0.15, false) < 0.9 ? ok('misconception pulls mastery down') : fail('down-move wrong');
+// Bounds stay in [0,1].
+nextMastery(1, 1, true) <= 1 && nextMastery(0, 0, false) >= 0 ? ok('mastery clamped to [0,1]') : fail('mastery not clamped');
+
+// A streak of correct answers crosses the mastery threshold in a sensible number of turns.
+let m = 0;
+let turnsToMaster = 0;
+for (let i = 1; i <= 12 && m < MASTERY_THRESHOLD; i++) {
+  m = nextMastery(m, 1, true);
+  turnsToMaster = i;
+}
+m >= MASTERY_THRESHOLD && turnsToMaster <= 8
+  ? ok(`mastery crosses ${MASTERY_THRESHOLD} after ${turnsToMaster} correct turns (game unlocks)`)
+  : fail(`mastery did not cross threshold sensibly (got ${m.toFixed(2)} in ${turnsToMaster})`);
+
+// Repeated misconceptions drive mastery back down.
+let d = 0.85;
+for (let i = 0; i < 5; i++) d = nextMastery(d, 0.15, false);
+d < 0.5 ? ok('repeated misconceptions decay mastery below 0.5') : fail(`misconception decay too weak (${d.toFixed(2)})`);
+
+// Difficulty deltas clamp to [1,3].
+nextDifficulty(3, 1) === 3 ? ok('difficulty clamps at max 3') : fail('difficulty exceeded 3');
+nextDifficulty(1, -1) === 1 ? ok('difficulty clamps at min 1') : fail('difficulty went below 1');
+nextDifficulty(2, 1) === 3 && nextDifficulty(2, -1) === 1 ? ok('difficulty steps by delta') : fail('difficulty step wrong');
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

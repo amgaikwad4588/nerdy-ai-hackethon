@@ -10,6 +10,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { SKILLS } from './curriculum';
+import { nextDifficulty, nextMastery } from './mastery';
 import type { Difficulty, MisconceptionEvent, TurnRecord } from './types';
 
 export const MASTERY_THRESHOLD = 0.8; // level at which a skill is "mastered" + game unlocks
@@ -54,9 +55,6 @@ const initialDifficulty = (): Record<string, Difficulty> =>
 const initialMastery = (): Record<string, number> =>
   Object.fromEntries(SKILLS.map((s) => [s.id, 0]));
 
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
-const clampDiff = (n: number): Difficulty => Math.max(1, Math.min(3, n)) as Difficulty;
-
 export const useStore = create<AppState>()(
   persist(
     (set) => ({
@@ -81,15 +79,10 @@ export const useStore = create<AppState>()(
         set((state) => {
           const { skillId, result } = turn;
           const prev = state.mastery[skillId] ?? 0;
-          // Exponential move toward the turn's mastery signal; correct answers
-          // pull up, misconceptions pull down.
-          const target = result.masterySignal;
-          const rate = result.isCorrect ? 0.34 : 0.22;
-          const nextMastery = clamp01(prev + (target - prev) * rate);
-
-          const nextDiff = clampDiff(
-            (state.difficulty[skillId] ?? 1) + result.difficultyDelta,
-          );
+          // EMA toward the turn's mastery signal (correct pulls up, misconceptions down)
+          // + a bounded difficulty step — pure functions in ./mastery for testability.
+          const nextMasteryVal = nextMastery(prev, result.masterySignal, result.isCorrect);
+          const nextDiff = nextDifficulty(state.difficulty[skillId] ?? 1, result.difficultyDelta);
 
           const events = [...state.events];
           if (result.misconceptionTag) {
@@ -104,7 +97,7 @@ export const useStore = create<AppState>()(
 
           return {
             turns: [turn, ...state.turns].slice(0, 200),
-            mastery: { ...state.mastery, [skillId]: nextMastery },
+            mastery: { ...state.mastery, [skillId]: nextMasteryVal },
             difficulty: { ...state.difficulty, [skillId]: nextDiff },
             events,
             xp: state.xp + (result.isCorrect ? 10 : 2),

@@ -47,6 +47,7 @@ export default function RootLayout() {
         <Stack.Screen name="car" options={{ title: 'Highway Racer', presentation: 'modal' }} />
         <Stack.Screen name="birds" options={{ title: 'Bird Shooter', presentation: 'modal' }} />
         <Stack.Screen name="teacher" options={{ title: 'Class Notebook' }} />
+        <Stack.Screen name="parent" options={{ title: 'For Parents' }} />
       </Stack>
       <CaptionBar />
     </>

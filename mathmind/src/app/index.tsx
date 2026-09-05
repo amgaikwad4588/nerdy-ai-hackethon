@@ -130,6 +130,16 @@ export default function Home() {
               router.push('/teacher');
             }}
           />
+          <BigButton
+            label="For parents"
+            variant="ghost"
+            tint={Brand.blue}
+            onPress={() => {
+              loadDemoData();
+              router.push('/parent');
+            }}
+            style={{ marginTop: Spacing.two }}
+          />
         </SketchSurface>
       </ScrollView>
     </SafeAreaView>

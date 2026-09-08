@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BigButton } from '@/components/big-button';
@@ -8,57 +8,57 @@ import { MasteryRing } from '@/components/mastery-ring';
 import { SettingsButton } from '@/components/settings-button';
 import { PaperBg, SketchSurface, StickyTag } from '@/components/sketch';
 import { ThemedText } from '@/components/themed-text';
-import { Brand, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Brand, MaxContentWidth, Spacing, Wobbly, offsetShadow } from '@/constants/theme';
 import { DOMAIN_LABEL, SKILLS } from '@/lib/curriculum';
 import { MASTERY_THRESHOLD, useStore } from '@/lib/store';
+
+const GAMES = [
+  { id: 'game', title: 'Math Sprint', blurb: 'Beat the clock', color: Brand.blue },
+  { id: 'car', title: 'Highway Racer', blurb: 'Race your class', color: Brand.accent },
+  { id: 'birds', title: 'Bird Shooter', blurb: 'Shoot the answer', color: '#3f9d6b' },
+] as const;
 
 export default function Home() {
   const router = useRouter();
   const { studentName, mastery, xp, streak, setRole, loadDemoData } = useStore();
 
-  const overall =
-    SKILLS.reduce((s, sk) => s + (mastery[sk.id] ?? 0), 0) / SKILLS.length;
+  const overall = SKILLS.reduce((s, sk) => s + (mastery[sk.id] ?? 0), 0) / SKILLS.length;
   const mastered = SKILLS.filter((s) => (mastery[s.id] ?? 0) >= MASTERY_THRESHOLD).length;
 
   return (
     <SafeAreaView style={styles.safe}>
       <PaperBg />
       <ScrollView contentContainerStyle={styles.container}>
-        {/* Masthead — a scribbled title */}
-        <View style={styles.headerRow}>
+        {/* ---- Masthead ---- */}
+        <View style={styles.masthead}>
           <View style={{ flex: 1 }}>
             <View style={styles.brandRow}>
-              <ThemedText type="title" style={styles.brand}>
-                MathMind
-              </ThemedText>
-              <ThemedText type="title" style={styles.bang}>
-                !
-              </ThemedText>
+              <ThemedText type="title" style={styles.brand}>MathMind</ThemedText>
+              <ThemedText type="title" style={styles.bang}>!</ThemedText>
             </View>
             <View style={styles.wavyUnderline} />
-            <ThemedText style={{ color: Brand.muted, marginTop: Spacing.two }}>
+            <ThemedText type="small" style={{ color: Brand.muted, marginTop: Spacing.two }}>
               Talk-it-through math for grades 3–5
             </ThemedText>
           </View>
-          <View style={{ transform: [{ rotate: '4deg' }] }}>
-            <MasteryRing level={overall} size={68} color={Brand.blue} />
+          <View style={styles.mastheadRight}>
+            <View style={{ transform: [{ rotate: '4deg' }] }}>
+              <MasteryRing level={overall} size={56} color={Brand.blue} />
+            </View>
+            <SettingsButton />
           </View>
-          <SettingsButton style={{ marginLeft: Spacing.three }} />
         </View>
 
-        {/* Milo greets the student — tap him to hear it */}
-        <Buddy
-          mood="happy"
-          message={`Hi ${studentName}! I'm Milo. Tap Start, and talk me through your thinking.`}
-          style={{ marginTop: Spacing.two }}
-        />
+        {/* ---- Hero: Milo + stats + primary action (the focal point) ---- */}
+        <SketchSurface decoration="tape" rotate={-0.75} shadow={7} radius="lg" style={styles.hero}>
+          <Buddy mood="happy" message={`Hi ${studentName}! Ready to talk it through?`} size={84} />
 
-        {/* Student hero card — taped to the page */}
-        <SketchSurface decoration="tape" rotate={-1} shadow={6} radius="lg" style={styles.hero}>
-          <ThemedText type="subtitle">Hi {studentName}!</ThemedText>
-          <ThemedText style={{ color: Brand.muted, marginBottom: Spacing.three }}>
-            {mastered} of {SKILLS.length} skills mastered · {xp} XP · {streak} day streak
-          </ThemedText>
+          <View style={styles.statRow}>
+            <Stat value={`${mastered}/${SKILLS.length}`} label="mastered" tint={Brand.blue} />
+            <Stat value={String(xp)} label="XP" tint={Brand.ink} />
+            <Stat value={String(streak)} label="day streak" tint={Brand.accent} />
+          </View>
+
           <BigButton
             label="Start a 90-second practice"
             variant="primary"
@@ -79,78 +79,96 @@ export default function Home() {
           />
         </SketchSurface>
 
-        <StickyTag label="YOUR SKILLS" rotate={-3} style={{ marginTop: Spacing.four }} />
+        {/* ---- Skills ---- */}
+        <View style={styles.sectionHead}>
+          <StickyTag label="YOUR SKILLS" rotate={-2} />
+          <ThemedText type="small" style={{ color: Brand.muted }}>
+            {mastered} of {SKILLS.length} mastered
+          </ThemedText>
+        </View>
         <View style={styles.skillGrid}>
-          {SKILLS.map((s, i) => (
-            <SketchSurface
-              key={s.id}
-              radius="sm"
-              shadow={3}
-              rotate={i % 2 === 0 ? -1 : 1}
-              style={styles.skillChip}
-            >
-              <MasteryRing level={mastery[s.id] ?? 0} size={46} color={Brand.domain[s.domain]} />
-              <View style={{ flex: 1 }}>
-                <ThemedText type="smallBold">{s.title}</ThemedText>
-                <ThemedText type="small" style={{ color: Brand.muted }}>
-                  {DOMAIN_LABEL[s.domain]}
+          {SKILLS.map((s) => {
+            const lvl = mastery[s.id] ?? 0;
+            return (
+              <View key={s.id} style={styles.skillCard}>
+                <MasteryRing level={lvl} size={44} color={Brand.domain[s.domain]} />
+                <View style={{ flex: 1 }}>
+                  <ThemedText type="smallBold" numberOfLines={1}>{s.title}</ThemedText>
+                  <ThemedText type="small" style={{ color: Brand.muted }} numberOfLines={1}>
+                    {DOMAIN_LABEL[s.domain]}
+                  </ThemedText>
+                </View>
+                <ThemedText type="smallBold" style={{ color: Brand.domain[s.domain] }}>
+                  {Math.round(lvl * 100)}%
                 </ThemedText>
               </View>
-            </SketchSurface>
+            );
+          })}
+        </View>
+
+        {/* ---- Games ---- */}
+        <View style={styles.sectionHead}>
+          <StickyTag label="PLAY & PRACTICE" rotate={-2} />
+          <ThemedText type="small" style={{ color: Brand.muted }}>reward + more practice</ThemedText>
+        </View>
+        <View style={styles.gameRow}>
+          {GAMES.map((g) => (
+            <Pressable key={g.id} onPress={() => router.push(`/${g.id}` as never)} style={styles.gameTile}>
+              <View style={[styles.gameStripe, { backgroundColor: g.color }]} />
+              <ThemedText type="smallBold" numberOfLines={1}>{g.title}</ThemedText>
+              <ThemedText type="small" style={{ color: Brand.muted }} numberOfLines={1}>{g.blurb}</ThemedText>
+            </Pressable>
           ))}
         </View>
 
-        {/* Games — reward + more practice */}
-        <StickyTag label="GAMES" rotate={-2} style={{ marginTop: Spacing.five }} />
-        <View style={{ gap: Spacing.three, marginTop: Spacing.two }}>
-          <BigButton label="Math Sprint" variant="secondary" tint={Brand.blue} onPress={() => router.push('/game')} />
-          <BigButton label="Highway Racer" variant="secondary" tint={Brand.blue} onPress={() => router.push('/car')} />
-          <BigButton label="Bird Shooter" variant="secondary" tint={Brand.blue} onPress={() => router.push('/birds')} />
-        </View>
-
-        {/* Teacher entry — a pinned post-it */}
-        <SketchSurface
-          tone="postit"
-          decoration="tack"
-          rotate={1}
-          shadow={5}
-          style={{ marginTop: Spacing.five }}
-        >
-          <ThemedText type="smallBold">FOR TEACHERS</ThemedText>
-          <ThemedText type="small" style={{ color: Brand.ink, marginBottom: Spacing.three, marginTop: 2 }}>
-            See each student&apos;s mastery and the exact misconceptions to reteach.
+        {/* ---- Grown-ups (de-emphasized) ---- */}
+        <View style={styles.grownups}>
+          <ThemedText type="smallBold" style={{ color: Brand.muted, letterSpacing: 0.5 }}>FOR GROWN-UPS</ThemedText>
+          <ThemedText type="small" style={{ color: Brand.muted, marginTop: 2, marginBottom: Spacing.three }}>
+            Teachers see every student&apos;s mastery and misconceptions to reteach; parents get a calm home summary.
           </ThemedText>
-          <BigButton
-            label="Open class notebook"
-            variant="ghost"
-            tint={Brand.ink}
-            onPress={() => {
-              setRole('teacher');
-              loadDemoData();
-              router.push('/teacher');
-            }}
-          />
-          <BigButton
-            label="For parents"
-            variant="ghost"
-            tint={Brand.blue}
-            onPress={() => {
-              loadDemoData();
-              router.push('/parent');
-            }}
-            style={{ marginTop: Spacing.two }}
-          />
-        </SketchSurface>
-
-        <BigButton
-          label="Sign in / switch class"
-          variant="ghost"
-          tint={Brand.ink}
-          onPress={() => router.push('/signin')}
-          style={{ marginTop: Spacing.four }}
-        />
+          <View style={styles.grownRow}>
+            <BigButton
+              label="Teacher"
+              variant="ghost"
+              tint={Brand.ink}
+              onPress={() => {
+                setRole('teacher');
+                loadDemoData();
+                router.push('/teacher');
+              }}
+              style={styles.grownBtn}
+            />
+            <BigButton
+              label="Parent"
+              variant="ghost"
+              tint={Brand.blue}
+              onPress={() => {
+                loadDemoData();
+                router.push('/parent');
+              }}
+              style={styles.grownBtn}
+            />
+            <BigButton
+              label="Sign in"
+              variant="ghost"
+              tint={Brand.muted}
+              onPress={() => router.push('/signin')}
+              style={styles.grownBtn}
+            />
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function Stat({ value, label, tint }: { value: string; label: string; tint: string }) {
+  return (
+    <View style={styles.stat}>
+      <ThemedText type="smallBold" style={{ color: tint, fontSize: 22, lineHeight: 26 }}>{value}</ThemedText>
+      <ThemedText type="small" style={{ color: Brand.muted }}>{label}</ThemedText>
+    </View>
   );
 }
 
@@ -158,41 +176,83 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Brand.paper },
   container: {
     padding: Spacing.four,
-    gap: Spacing.three,
+    gap: Spacing.four,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: Spacing.two,
-    marginBottom: Spacing.two,
-  },
+
+  masthead: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.two },
+  mastheadRight: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   brandRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  brand: { fontSize: 46, lineHeight: 50 },
-  bang: {
-    fontSize: 46,
-    lineHeight: 50,
-    color: Brand.accent,
-    transform: [{ rotate: '8deg' }],
-    marginLeft: 2,
-  },
+  brand: { fontSize: 44, lineHeight: 48 },
+  bang: { fontSize: 44, lineHeight: 48, color: Brand.accent, transform: [{ rotate: '8deg' }], marginLeft: 2 },
   wavyUnderline: {
     height: 4,
-    width: 168,
+    width: 150,
     marginTop: 2,
     backgroundColor: Brand.accent,
     borderTopLeftRadius: 8,
     borderBottomRightRadius: 8,
     transform: [{ rotate: '-1deg' }],
   },
-  hero: { marginTop: Spacing.three, gap: Spacing.one },
-  skillGrid: { gap: Spacing.three, marginTop: Spacing.two },
-  skillChip: {
+
+  hero: { gap: Spacing.three },
+  statRow: { flexDirection: 'row', gap: Spacing.two },
+  stat: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: Brand.cream,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    ...Wobbly.sm,
+    paddingVertical: Spacing.two,
+  },
+
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+
+  skillGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three, marginTop: -Spacing.two },
+  skillCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    minWidth: 220,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.two,
+    backgroundColor: Brand.card,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    ...Wobbly.sm,
+    ...offsetShadow(3, Brand.ink),
+    padding: Spacing.three,
   },
+
+  gameRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three, marginTop: -Spacing.two },
+  gameTile: {
+    flexBasis: '31%',
+    flexGrow: 1,
+    minWidth: 150,
+    backgroundColor: Brand.card,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    ...Wobbly.md,
+    ...offsetShadow(4, Brand.ink),
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    gap: 2,
+    overflow: 'hidden',
+  },
+  gameStripe: { position: 'absolute', top: 0, left: 0, bottom: 0, width: 6 },
+
+  grownups: {
+    backgroundColor: Brand.erased,
+    borderWidth: 2,
+    borderColor: Brand.ink,
+    borderStyle: 'dashed',
+    ...Wobbly.md,
+    padding: Spacing.three,
+    marginTop: Spacing.two,
+  },
+  grownRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
+  grownBtn: { flexBasis: '31%', flexGrow: 1, minWidth: 120 },
 });

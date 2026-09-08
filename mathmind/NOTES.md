@@ -8,6 +8,15 @@ roadmap: [ROADMAP.md](./ROADMAP.md).)
 
 ## 2026-09-04
 
+### Roadmap module 6 — auth & rostering (demo-grade, local)
+- Store gains `classroom` + `roster` (+ `createClass`/`joinClass`); `loadDemoData` seeds
+  "Room 3B" (code MATH42) with 5 students (varied mastery + misconception events).
+- `/signin`: teacher opens a class (shows join code); student joins with code + name.
+- Teacher dashboard rebuilt **multi-student**: class header + join code, tappable roster
+  with per-student attention flags, and drill-down heatmap + reteach list per student.
+- All local (no backend) so it can't fail on stage; actions are shaped to swap to Supabase
+  Auth + RLS later. See [GAPS.md](./GAPS.md) #1.
+
 ### Roadmap module 5 — reading-friendly font + high contrast (a11y part 2)
 - Two new settings (`readableFont`, `highContrast`), wired through `ThemedText` so they
   apply app-wide: reading-friendly swaps the handwriting for a plain legible font stack

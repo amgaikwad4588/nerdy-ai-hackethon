@@ -17,6 +17,21 @@ export const MASTERY_THRESHOLD = 0.8; // level at which a skill is "mastered" + 
 
 export type Role = 'student' | 'teacher';
 
+/** A student as seen on the teacher's roster (a snapshot; Supabase would back this). */
+export interface ClassStudent {
+  id: string;
+  name: string;
+  grade: 3 | 4 | 5;
+  mastery: Record<string, number>;
+  events: MisconceptionEvent[];
+}
+
+export interface Classroom {
+  name: string;
+  code: string; // join code students enter
+  teacherName: string;
+}
+
 export interface AppSettings {
   readAloud: boolean; // Milo speaks aloud (TTS)
   captions: boolean; // show on-screen subtitles of what's spoken
@@ -37,17 +52,23 @@ interface AppState {
   streak: number;
   settings: AppSettings;
   scoreEligible: boolean; // camera-on during study → eligible for the game scoreboard
+  classroom: Classroom | null; // the class this device is signed into
+  roster: ClassStudent[]; // students in the class (teacher view)
 
   // actions
   setRole: (role: Role) => void;
   setStudentName: (name: string) => void;
   setSetting: <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => void;
   setScoreEligible: (v: boolean) => void;
+  createClass: (className: string, teacherName: string) => void;
+  joinClass: (code: string, studentName: string) => void;
   recordTurn: (turn: TurnRecord) => void;
   resolveOpenEvents: (skillId: string) => void;
   resetProgress: () => void;
   loadDemoData: () => void;
 }
+
+const genCode = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
 const initialDifficulty = (): Record<string, Difficulty> =>
   Object.fromEntries(SKILLS.map((s) => [s.id, 1 as Difficulty]));
@@ -68,12 +89,36 @@ export const useStore = create<AppState>()(
       streak: 0,
       settings: { readAloud: true, captions: true, reduceMotion: false, readableFont: false, highContrast: false },
       scoreEligible: false,
+      classroom: null,
+      roster: [],
 
       setRole: (role) => set({ role }),
       setStudentName: (studentName) => set({ studentName }),
       setSetting: (key, value) =>
         set((state) => ({ settings: { ...state.settings, [key]: value } })),
       setScoreEligible: (scoreEligible) => set({ scoreEligible }),
+
+      // Teacher creates a class → a join code students enter. (Supabase would persist this
+      // and scope rows via RLS; here it's local for the demo.)
+      createClass: (className, teacherName) =>
+        set((s) => ({
+          role: 'teacher',
+          classroom: s.classroom ?? { name: className || 'My Class', code: genCode(), teacherName: teacherName || 'Teacher' },
+        })),
+
+      // Student joins with a code + name → added to the roster with their current snapshot.
+      joinClass: (code, studentName) =>
+        set((s) => {
+          const name = studentName || 'Student';
+          const already = s.roster.some((r) => r.name.toLowerCase() === name.toLowerCase());
+          const me: ClassStudent = { id: `me-${Date.now()}`, name, grade: 3, mastery: { ...s.mastery }, events: [...s.events] };
+          return {
+            role: 'student',
+            studentName: name,
+            classroom: s.classroom ?? { name: 'Room 3B', code: (code || genCode()).toUpperCase(), teacherName: 'Ms. Rivera' },
+            roster: already ? s.roster : [...s.roster, me],
+          };
+        }),
 
       recordTurn: (turn) =>
         set((state) => {
@@ -170,6 +215,53 @@ export const useStore = create<AppState>()(
             ],
             xp: 340,
             streak: 4,
+            classroom: { name: 'Room 3B', code: 'MATH42', teacherName: 'Ms. Rivera' },
+            roster: [
+              {
+                id: 'stu-aanya',
+                name: 'Aanya',
+                grade: 3,
+                mastery: { 'place-value': 0.92, 'multi-add': 0.86, 'mult-facts': 0.7, 'mult-arrays': 0.45, 'frac-compare': 0.38, 'frac-equiv': 0.1 },
+                events: [
+                  { id: 'r-a1', at: now - 1000 * 60 * 4, skillId: 'frac-compare', tag: 'bigger-denominator-bigger', resolved: false },
+                ],
+              },
+              {
+                id: 'stu-veer',
+                name: 'Veer',
+                grade: 3,
+                mastery: { 'place-value': 0.7, 'multi-add': 0.5, 'mult-facts': 0.9, 'mult-arrays': 0.8, 'frac-compare': 0.6, 'frac-equiv': 0.4 },
+                events: [
+                  { id: 'r-v1', at: now - 1000 * 60 * 12, skillId: 'multi-add', tag: 'no-regrouping', resolved: false },
+                ],
+              },
+              {
+                id: 'stu-mei',
+                name: 'Mei',
+                grade: 3,
+                mastery: { 'place-value': 0.95, 'multi-add': 0.9, 'mult-facts': 0.88, 'mult-arrays': 0.82, 'frac-compare': 0.8, 'frac-equiv': 0.72 },
+                events: [],
+              },
+              {
+                id: 'stu-diego',
+                name: 'Diego',
+                grade: 3,
+                mastery: { 'place-value': 0.4, 'multi-add': 0.3, 'mult-facts': 0.55, 'mult-arrays': 0.35, 'frac-compare': 0.2, 'frac-equiv': 0.05 },
+                events: [
+                  { id: 'r-d1', at: now - 1000 * 60 * 8, skillId: 'mult-facts', tag: 'add-instead-of-multiply', resolved: false },
+                  { id: 'r-d2', at: now - 1000 * 60 * 30, skillId: 'mult-arrays', tag: 'added-rows-and-columns', resolved: false },
+                ],
+              },
+              {
+                id: 'stu-sara',
+                name: 'Sara',
+                grade: 3,
+                mastery: { 'place-value': 0.82, 'multi-add': 0.75, 'mult-facts': 0.6, 'mult-arrays': 0.5, 'frac-compare': 0.9, 'frac-equiv': 0.85 },
+                events: [
+                  { id: 'r-s1', at: now - 1000 * 60 * 50, skillId: 'mult-facts', tag: 'skip-count-short', resolved: false },
+                ],
+              },
+            ],
           };
         }),
     }),
@@ -185,6 +277,8 @@ export const useStore = create<AppState>()(
         xp: s.xp,
         streak: s.streak,
         settings: s.settings,
+        classroom: s.classroom,
+        roster: s.roster,
       }),
     },
   ),

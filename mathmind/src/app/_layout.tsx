@@ -40,6 +40,7 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="signin" options={{ title: 'Sign In' }} />
         <Stack.Screen name="learn" options={{ title: 'My Practice' }} />
         <Stack.Screen name="progress" options={{ title: 'My Progress' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />

@@ -141,6 +141,14 @@ export default function Home() {
             style={{ marginTop: Spacing.two }}
           />
         </SketchSurface>
+
+        <BigButton
+          label="Sign in / switch class"
+          variant="ghost"
+          tint={Brand.ink}
+          onPress={() => router.push('/signin')}
+          style={{ marginTop: Spacing.four }}
+        />
       </ScrollView>
     </SafeAreaView>
   );

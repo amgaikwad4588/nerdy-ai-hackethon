@@ -4,15 +4,20 @@ Honest engineering gaps between the hackathon demo and a production K-5 tool. Ke
 on purpose: knowing these (and having a plan) is itself a signal of product maturity.
 Status: ✅ addressed · 🟡 partial · ⬜ open.
 
-## 1. Auth & rostering — ⬜ open
-**Gap:** No sign-in or class rostering. Today it's single-user local state (zustand +
-AsyncStorage) with Supabase scaffolded but not wired for identity. How does a teacher
-create a class, and how does a student land in the right account?
-**Plan:** Use Supabase Auth (email/OTP or a district SSO later). Data model already has
-`profiles(role)`, `sessions`, `mastery`, `misconception_events`, and **RLS** so students
-see only their rows and a teacher sees only their class. Add: teacher creates a class →
-generates join codes → students join → roster populates the dashboard. Swap the local
-store reads/writes for Supabase-backed ones behind the same interface.
+## 1. Auth & rostering — 🟡 partial (demo-grade)
+**Gap:** How does a teacher create a class, and how does a student land in the right
+account?
+**Done (local/demo):** `/signin` role picker → **teacher opens a class with a join code**;
+**student joins with that code + name** and is added to the roster. The **teacher
+dashboard is now multi-student**: a class header with the join code, a tappable roster
+(each student's mastery + a "needs reteach" flag), and per-student heatmap + reteach list.
+State lives in the store (`classroom`, `roster`, `createClass`, `joinClass`) — structured
+so the same actions can be Supabase-backed later.
+**Still open (production):** real **Supabase Auth** (email/OTP or district SSO), server
+persistence + **RLS** (students see only their rows; a teacher only their class), and
+swapping the local store reads/writes for Supabase behind the same action interface. The
+schema (`profiles`, `sessions`, `mastery`, `misconception_events`) already exists in
+`supabase/migrations`.
 
 ## 2. Testing the core tutoring logic — 🟡 partial
 **Gap:** Mastery updates + misconception tagging are the core IP and are exactly what
